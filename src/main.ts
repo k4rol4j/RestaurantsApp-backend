@@ -17,7 +17,10 @@ async function bootstrap() {
   );
   app.use(cookieParser());
   app.enableCors({
-    origin: 'http://localhost:5173', // Frontend
+    origin: [
+      'http://localhost:5173',
+      'https://restaurantsapp-frontend.onrender.com',
+    ],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'], // Dodaj brakujące nagłówki
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Obsługiwane metody
