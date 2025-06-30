@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Restaurant {
+  id           Int           @id @default(autoincrement())
+  name         String
+  location     String
+  cuisine      String
+  rating       Float
+  reservations Reservation[]
+  reviews      Review[]
+  favorites    Favorite[]
+  latitude     Float?
+  longitude    Float?
+  imageUrl     String?
+  description  String?
+  imageGallery String?
+  openingHours String?
+  capacity Int @default(50)
+}
+
+model Review {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  rating        Int
+  comment       String
+  date          DateTime @default(now())
+  restaurantId  Int
+  reservationId Int?     @unique
+
+  restaurant  Restaurant   @relation(fields: [restaurantId], references: [id])
+  reservation Reservation? @relation(fields: [reservationId], references: [id]) // ← relacja opcjonalna!
+  user        User?        @relation(fields: [userId], references: [id])
+}
+
+model Reservation {
+  id     Int      @id @default(autoincrement())
+  date   DateTime
+  time   String
+  people Int
+
+  restaurantId Int
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  review Review? // ← odwrotna relacja
+}
+
+model Favorite {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  restaurantId Int
+  user         User       @relation(fields: [userId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([userId, restaurantId])
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
+  password     String
+  createdAt    DateTime      @default(now())
+  reviews      Review[]
+  reservations Reservation[]
+  favorites    Favorite[]
+}
