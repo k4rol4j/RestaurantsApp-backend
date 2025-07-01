@@ -25,15 +25,15 @@ export class AuthController {
       httpOnly: true,
       path: '/',
       maxAge: 60 * 60 * 1000, // 1 godzina
-      sameSite: 'lax',
-      secure: false, // WAŻNE: false na localhost
+      sameSite: 'none',
+      secure: true, // WAŻNE: false na localhost
     });
 
     res.cookie('is-logged', true, {
       path: '/',
       maxAge: 60 * 60 * 1000,
-      sameSite: 'lax',
-      secure: false,
+      sameSite: 'none',
+      secure: true,
     });
 
     res.status(200).send({
