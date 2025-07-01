@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -22,7 +22,7 @@ model Restaurant {
   description  String?
   imageGallery String?
   openingHours String?
-  capacity Int @default(50)
+  capacity     Int           @default(50)
 }
 
 model Review {
