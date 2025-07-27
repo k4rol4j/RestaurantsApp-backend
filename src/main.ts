@@ -22,8 +22,8 @@ async function bootstrap() {
       'https://restaurantsapp-frontend.onrender.com',
     ],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization'], // Dodaj brakujące nagłówki
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Obsługiwane metody
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
   await app.listen(process.env.PORT ?? 9000);
