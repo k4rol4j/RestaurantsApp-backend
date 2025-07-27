@@ -1,8 +1,10 @@
 import {
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -10,6 +12,7 @@ import { BasicGuard } from './basic.guard';
 import { UserID } from './user.decorator';
 import { TokenService } from '../token/token.service';
 import { Response } from 'express';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -26,7 +29,7 @@ export class AuthController {
       path: '/',
       maxAge: 60 * 60 * 1000, // 1 godzina
       sameSite: 'none',
-      secure: true, // WAŻNE: false na localhost
+      secure: true,
     });
 
     res.cookie('is-logged', true, {
@@ -46,9 +49,14 @@ export class AuthController {
     res.clearCookie('access-token');
     res.clearCookie('is-logged');
 
-    // Zakończenie odpowiedzi po usunięciu ciasteczek
     res.status(200).send({
       message: 'Logout successful',
     });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  me(@Req() req) {
+    return { id: req.user.sub, email: req.user.email };
   }
 }
