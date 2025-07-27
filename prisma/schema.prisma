@@ -51,7 +51,7 @@ model Reservation {
   userId Int
   user   User @relation(fields: [userId], references: [id])
 
-  review Review? // ← odwrotna relacja
+  review Review?
 }
 
 model Favorite {
