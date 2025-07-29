@@ -45,9 +45,17 @@ export class AuthController {
   }
 
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('access-token');
-    res.clearCookie('is-logged');
+  logout(@Res() res: Response) {
+    res.clearCookie('access-token', {
+      path: '/',
+      sameSite: 'none',
+      secure: true,
+    });
+    res.clearCookie('is-logged', {
+      path: '/',
+      sameSite: 'none',
+      secure: true,
+    });
 
     res.status(200).send({
       message: 'Logout successful',
