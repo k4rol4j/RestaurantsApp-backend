@@ -1,4 +1,4 @@
-import { IsInt, IsString, IsDateString } from 'class-validator';
+import { IsInt, IsString, IsDateString, Min } from 'class-validator';
 
 export class CreateReservationDto {
   @IsInt()
@@ -11,5 +11,6 @@ export class CreateReservationDto {
   time: string;
 
   @IsInt()
+  @Min(1)
   people: number;
 }

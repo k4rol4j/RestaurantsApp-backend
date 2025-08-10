@@ -36,14 +36,12 @@ export class ReservationsService {
   async createReservation(dto: CreateReservationDto, userId: number) {
     const { restaurantId, date, time, people } = dto;
 
-    // 1) Restauracja istnieje?
     const restaurant = await this.prisma.restaurant.findUnique({
       where: { id: restaurantId },
     });
     if (!restaurant)
       throw new BadRequestException('Restauracja nie znaleziona');
 
-    // 2) Godziny otwarcia – bezpieczny parse
     let openingHours: OpeningHours = {};
     if (restaurant.openingHours) {
       try {
@@ -55,16 +53,21 @@ export class ReservationsService {
       }
     }
 
-    // 3) Dzień tygodnia (klucz w openingHours)
-    const dayKey = new Date(date)
-      .toLocaleDateString('en-US', { weekday: 'long' })
-      .toLowerCase();
+    const days = [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+    ];
+    const dayKey = days[new Date(date).getDay()];
 
     if (!openingHours[dayKey]) {
       throw new BadRequestException(`Restauracja jest zamknięta w ${dayKey}`);
     }
 
-    // 4) Normalizacja czasu do HH:mm
     const normalizeTime = (t: string) => {
       const [h, m = '00'] = t.split(':');
       const hh = String(Number(h)).padStart(2, '0');
@@ -76,7 +79,7 @@ export class ReservationsService {
     const openNorm = normalizeTime(openingHours[dayKey].open);
     const closeNorm = normalizeTime(openingHours[dayKey].close);
 
-    if (tNorm < openNorm || tNorm > closeNorm) {
+    if (tNorm < openNorm || tNorm >= closeNorm) {
       throw new BadRequestException(
         `Restauracja przyjmuje rezerwacje od ${openNorm} do ${closeNorm}`,
       );
@@ -90,7 +93,6 @@ export class ReservationsService {
     const [hour, minute] = tNorm.split(':').map(Number);
     dateObj.setHours(hour, minute, 0, 0);
 
-    // 6) Sprawdź dostępność dla TEGO slotu (data + godzina)
     const existing = await this.prisma.reservation.findMany({
       where: {
         restaurantId,
@@ -105,7 +107,6 @@ export class ReservationsService {
       throw new BadRequestException('Brak dostępnych miejsc o tej godzinie');
     }
 
-    // 7) Zapis
     try {
       return await this.prisma.reservation.create({
         data: {
