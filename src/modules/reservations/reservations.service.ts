@@ -122,9 +122,10 @@ export class ReservationsService {
         e?.code ?? e,
         e?.meta ?? e?.message,
       );
+      console.error('Błąd zapisu rezerwacji:', e);
       throw new BadRequestException('Nie udało się utworzyć rezerwacji');
     }
-  } // ← ← ← zamyka createReservation ✅
+  }
 
   async getReservationsByUser(userId: number) {
     return this.prisma.reservation.findMany({
