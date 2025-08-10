@@ -14,7 +14,6 @@ export class ReservationsController {
     @Body() dto: CreateReservationDto,
     @UserID() userId: number,
   ) {
-    console.log('✅ WYWOŁUJĘ METODĘ W SERWISIE');
     return this.reservationsService.createReservation(dto, userId);
   }
 

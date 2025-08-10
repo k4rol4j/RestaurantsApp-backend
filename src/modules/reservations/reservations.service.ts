@@ -9,25 +9,25 @@ type OpeningHours = {
   };
 };
 
-function calculateDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-): number {
-  const toRad = (value: number) => (value * Math.PI) / 180;
-  const R = 6371; // Promień Ziemi w km
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+// function calculateDistance(
+//   lat1: number,
+//   lon1: number,
+//   lat2: number,
+//   lon2: number,
+// ): number {
+//   const toRad = (value: number) => (value * Math.PI) / 180;
+//   const R = 6371; // Promień Ziemi w km
+//   const dLat = toRad(lat2 - lat1);
+//   const dLon = toRad(lon2 - lon1);
+//   const a =
+//     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+//     Math.cos(toRad(lat1)) *
+//       Math.cos(toRad(lat2)) *
+//       Math.sin(dLon / 2) *
+//       Math.sin(dLon / 2);
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
 
 @Injectable()
 export class ReservationsService {
@@ -36,87 +36,101 @@ export class ReservationsService {
   async createReservation(dto: CreateReservationDto, userId: number) {
     const { restaurantId, date, time, people } = dto;
 
+    // 1) Restauracja istnieje?
     const restaurant = await this.prisma.restaurant.findUnique({
       where: { id: restaurantId },
     });
-
-    if (!restaurant) {
+    if (!restaurant)
       throw new BadRequestException('Restauracja nie znaleziona');
+
+    // 2) Godziny otwarcia – bezpieczny parse
+    let openingHours: OpeningHours = {};
+    if (restaurant.openingHours) {
+      try {
+        openingHours = JSON.parse(restaurant.openingHours) as OpeningHours;
+      } catch {
+        throw new BadRequestException(
+          'Błędny format godzin otwarcia restauracji',
+        );
+      }
     }
 
-    // 📅 Sprawdź godziny otwarcia
-    const openingHours = restaurant.openingHours
-      ? (JSON.parse(restaurant.openingHours) as OpeningHours)
-      : {};
-
-    const day = new Date(date)
-      .toLocaleDateString('en-US', {
-        weekday: 'long',
-      })
+    // 3) Dzień tygodnia (klucz w openingHours)
+    const dayKey = new Date(date)
+      .toLocaleDateString('en-US', { weekday: 'long' })
       .toLowerCase();
 
-    if (!openingHours[day]) {
-      throw new BadRequestException(`Restauracja jest zamknięta w ${day}`);
+    if (!openingHours[dayKey]) {
+      throw new BadRequestException(`Restauracja jest zamknięta w ${dayKey}`);
     }
 
-    const { open, close } = openingHours[day];
-    if (time < open || time > close) {
+    // 4) Normalizacja czasu do HH:mm
+    const normalizeTime = (t: string) => {
+      const [h, m = '00'] = t.split(':');
+      const hh = String(Number(h)).padStart(2, '0');
+      const mm = String(Number(m)).padStart(2, '0');
+      return `${hh}:${mm}`;
+    };
+
+    const tNorm = normalizeTime(time);
+    const openNorm = normalizeTime(openingHours[dayKey].open);
+    const closeNorm = normalizeTime(openingHours[dayKey].close);
+
+    if (tNorm < openNorm || tNorm > closeNorm) {
       throw new BadRequestException(
-        `Restauracja przyjmuje rezerwacje od ${open} do ${close}`,
+        `Restauracja przyjmuje rezerwacje od ${openNorm} do ${closeNorm}`,
       );
     }
 
-    // Utwórz pełny obiekt daty i godziny
-    const [hour, minute] = time.split(':');
+    // 5) Złóż pełny DateTime
     const dateObj = new Date(date);
-    dateObj.setHours(Number(hour));
-    dateObj.setMinutes(Number(minute));
-    dateObj.setSeconds(0);
-    dateObj.setMilliseconds(0);
+    if (Number.isNaN(dateObj.getTime())) {
+      throw new BadRequestException('Nieprawidłowa data');
+    }
+    const [hour, minute] = tNorm.split(':').map(Number);
+    dateObj.setHours(hour, minute, 0, 0);
 
-    // Sprawdź dostępność miejsc
-    const existingReservations = await this.prisma.reservation.findMany({
+    // 6) Sprawdź dostępność dla TEGO slotu (data + godzina)
+    const existing = await this.prisma.reservation.findMany({
       where: {
         restaurantId,
-        date: dateObj,
+        date: dateObj, // timestamp z godziną
+        time: tNorm, // kolumna text
       },
+      select: { people: true },
     });
 
-    const totalPeople = existingReservations.reduce(
-      (sum, r) => sum + r.people,
-      0,
-    );
+    const totalPeople = existing.reduce((sum, r) => sum + r.people, 0);
     if (totalPeople + people > restaurant.capacity) {
       throw new BadRequestException('Brak dostępnych miejsc o tej godzinie');
     }
 
-    // ✅ Utwórz rezerwację
+    // 7) Zapis
     try {
       return await this.prisma.reservation.create({
         data: {
           restaurantId,
           userId,
           date: dateObj,
-          time,
+          time: tNorm,
           people,
         },
       });
-    } catch (error) {
-      console.error('Błąd zapisu rezerwacji:', error);
-      throw error;
+    } catch (e: any) {
+      console.error(
+        'Błąd zapisu rezerwacji:',
+        e?.code ?? e,
+        e?.meta ?? e?.message,
+      );
+      throw new BadRequestException('Nie udało się utworzyć rezerwacji');
     }
-  }
+  } // ← ← ← zamyka createReservation ✅
 
   async getReservationsByUser(userId: number) {
     return this.prisma.reservation.findMany({
       where: { userId },
-      include: {
-        restaurant: true,
-        review: true,
-      },
-      orderBy: {
-        date: 'desc',
-      },
+      include: { restaurant: true, review: true },
+      orderBy: { date: 'desc' },
     });
   }
 }
