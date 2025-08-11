@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 
@@ -239,6 +243,29 @@ export class ReservationsService {
         tables: { include: { table: true } }, // pokaż przypisane stoliki
       },
       orderBy: { date: 'desc' },
+    });
+  }
+
+  async cancelReservation(reservationId: number, userId: number) {
+    const reservation = await this.prisma.reservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!reservation) {
+      throw new ForbiddenException('Rezerwacja nie istnieje.');
+    }
+
+    if (reservation.userId !== userId) {
+      throw new ForbiddenException('Nie możesz usunąć cudzej rezerwacji.');
+    }
+
+    // Opcjonalnie: blokada usuwania przeszłych rezerwacji
+    if (reservation.date < new Date()) {
+      throw new ForbiddenException('Nie można anulować przeszłej rezerwacji.');
+    }
+
+    return this.prisma.reservation.delete({
+      where: { id: reservationId },
     });
   }
 }

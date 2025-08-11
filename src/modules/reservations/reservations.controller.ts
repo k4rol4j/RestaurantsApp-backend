@@ -1,4 +1,12 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  Delete,
+  Param,
+} from '@nestjs/common';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { TokenGuard } from '../auth/token-guard';
 import { UserID } from '../auth/user.decorator';
@@ -21,5 +29,11 @@ export class ReservationsController {
   @UseGuards(TokenGuard)
   async getMyReservations(@UserID() userId: number) {
     return this.reservationsService.getReservationsByUser(userId);
+  }
+
+  @UseGuards(TokenGuard)
+  @Delete(':id')
+  async cancelReservation(@Param('id') id: string, @UserID() userId: number) {
+    return this.reservationsService.cancelReservation(Number(id), userId);
   }
 }
