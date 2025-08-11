@@ -78,15 +78,16 @@ export class RestaurantsService {
 
     // 3) Dostępność (data + godzina + liczba osób)
     // 3) Dostępność (data + godzina + liczba osób)
+    // 3) Dostępność (data + godzina + liczba osób)
     if (date && time && partySize) {
-      const SLOT_DURATION = 120; // min – jeśli masz inną długość slotu, zmień
+      const SLOT_DURATION = 120; // min
 
-      // Zakres dnia do pobrania rezerwacji (bez zabawy z UTC)
+      // Zakres dnia do pobrania rezerwacji (unikamy UTC/ISO)
       const dayStart = new Date(`${date}T00:00:00`);
       const nextDayStart = new Date(dayStart);
       nextDayStart.setDate(nextDayStart.getDate() + 1);
 
-      // Pomocniczo liczymy minuty w obrębie dnia, ignorujemy sekundy
+      // Minuty w obrębie dnia
       const toMin = (hhmm: string) => {
         const [h, m] = (hhmm ?? '00:00').slice(0, 5).split(':').map(Number);
         return (h || 0) * 60 + (m || 0);
@@ -95,7 +96,7 @@ export class RestaurantsService {
       const slotStartMin = toMin(time);
       const slotEndMin = slotStartMin + SLOT_DURATION;
 
-      // (opcjonalnie) sprawdzanie godzin otwarcia "HH:mm-HH:mm"
+      // (opcjonalnie) godziny otwarcia "HH:mm-HH:mm"
       const withinOpeningHours = (openingHours?: string | null) => {
         if (!openingHours) return true;
         const [open, close] = openingHours.split('-').map((s) => s.trim());
@@ -109,10 +110,10 @@ export class RestaurantsService {
       for (const r of restaurants) {
         if (!withinOpeningHours((r as any).openingHours)) continue;
 
-        // Jeśli capacity brak w DB, nie wycinaj lokalu przez brak danych
+        // ⬅️ klucz: jeśli capacity brak, nie wycinaj lokalu
         const capacity = r.capacity ?? Number.MAX_SAFE_INTEGER;
 
-        // Wszystkie rezerwacje tego dnia dla lokalu (bez konwersji na ISO)
+        // Rezerwacje tylko z tego dnia (bez ISO/UTC)
         const dayReservations = await this.prisma.reservation.findMany({
           where: {
             restaurantId: r.id,
@@ -121,7 +122,7 @@ export class RestaurantsService {
           select: { time: true, people: true, durationMinutes: true },
         });
 
-        // Zlicz zajęte miejsca w slocie (overlap po minutach dnia)
+        // Zlicz zajęte miejsca tylko w nakładającym się slocie
         let used = 0;
         for (const res of dayReservations) {
           const resStartMin = toMin(res.time);
