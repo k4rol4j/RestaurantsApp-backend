@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TablesService } from './tables.service';
 import { TablesController } from './tables.controller';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Module({
-  providers: [TablesService],
-  controllers: [TablesController]
+  controllers: [TablesController],
+  providers: [TablesService, PrismaService],
+  exports: [TablesService],
 })
 export class TablesModule {}
