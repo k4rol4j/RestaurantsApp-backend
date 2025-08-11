@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AuthController } from './auth/auth.controller';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
+import { TablesModule } from './modules/tables/tables/tables.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
     AuthModule,
     ReservationsModule,
     FavoritesModule,
+    TablesModule,
   ],
   controllers: [AppController, AuthController],
   providers: [AppService],

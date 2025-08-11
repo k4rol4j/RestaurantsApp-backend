@@ -7,6 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Table {
+  id           Int     @id @default(autoincrement())
+  restaurantId Int
+  seats        Int // 1,2,4,6...
+  name         String? // np. "A1"
+  isActive     Boolean @default(true)
+
+  restaurant   Restaurant         @relation(fields: [restaurantId], references: [id])
+  reservations ReservationTable[]
+
+  @@index([restaurantId, seats])
+}
+
 model Restaurant {
   id           Int           @id @default(autoincrement())
   name         String
@@ -23,6 +36,7 @@ model Restaurant {
   imageGallery String?
   openingHours String?
   capacity     Int           @default(50)
+  tables       Table[]
 }
 
 model Review {
@@ -40,12 +54,13 @@ model Review {
 }
 
 model Reservation {
-  id     Int      @id @default(autoincrement())
-  date   DateTime
-  time   String
-  people Int
-  durationMinutes Int       @default(90)
-  endAt        DateTime
+  id              Int                @id @default(autoincrement())
+  date            DateTime
+  time            String
+  people          Int
+  durationMinutes Int                @default(90)
+  endAt           DateTime
+  tables          ReservationTable[]
 
   restaurantId Int
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
@@ -74,4 +89,14 @@ model User {
   reviews      Review[]
   reservations Reservation[]
   favorites    Favorite[]
+}
+
+model ReservationTable {
+  reservationId Int
+  tableId       Int
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  table       Table       @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@id([reservationId, tableId])
 }
