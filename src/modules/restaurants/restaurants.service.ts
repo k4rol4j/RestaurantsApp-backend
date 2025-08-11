@@ -77,70 +77,62 @@ export class RestaurantsService {
     }
 
     // 3) Dostępność (data + godzina + liczba osób)
+    // 3) Dostępność (data + godzina + liczba osób)
     if (date && time && partySize) {
-      // Domyślna długość rezerwacji, jeśli rekordy nie mają ustawionego durationMinutes
-      const DEFAULT_DURATION = 120;
+      const SLOT_DURATION = 120; // min – jeśli masz inną długość slotu, zmień
 
-      // Budujemy zakres slotu użytkownika
-      const slotStart = new Date(`${date}T${time}:00`);
-      const slotDurationMin = DEFAULT_DURATION; // możesz też dodać do DTO jeśli ma być zmienne
-      const slotEnd = new Date(
-        slotStart.getTime() + slotDurationMin * 60 * 1000,
-      );
+      // Zakres dnia do pobrania rezerwacji (bez zabawy z UTC)
       const dayStart = new Date(`${date}T00:00:00`);
       const nextDayStart = new Date(dayStart);
       nextDayStart.setDate(nextDayStart.getDate() + 1);
 
-      // Helper do sprawdzania godzin otwarcia w formacie "HH:mm-HH:mm" (opcjonalnie)
+      // Pomocniczo liczymy minuty w obrębie dnia, ignorujemy sekundy
+      const toMin = (hhmm: string) => {
+        const [h, m] = (hhmm ?? '00:00').slice(0, 5).split(':').map(Number);
+        return (h || 0) * 60 + (m || 0);
+      };
+
+      const slotStartMin = toMin(time);
+      const slotEndMin = slotStartMin + SLOT_DURATION;
+
+      // (opcjonalnie) sprawdzanie godzin otwarcia "HH:mm-HH:mm"
       const withinOpeningHours = (openingHours?: string | null) => {
         if (!openingHours) return true;
         const [open, close] = openingHours.split('-').map((s) => s.trim());
-        const toMin = (hhmm: string) => {
-          const [h, m] = hhmm.split(':').map(Number);
-          return h * 60 + m;
-        };
-        const [h, m] = time.split(':').map(Number);
-        const tMin = h * 60 + m;
-        return tMin >= toMin(open) && tMin < toMin(close);
+        const openMin = toMin(open);
+        const closeMin = toMin(close);
+        return slotStartMin >= openMin && slotStartMin < closeMin;
       };
 
       const available: typeof restaurants = [];
 
       for (const r of restaurants) {
-        if (!withinOpeningHours(r.openingHours)) continue;
+        if (!withinOpeningHours((r as any).openingHours)) continue;
 
+        // Jeśli capacity brak w DB, nie wycinaj lokalu przez brak danych
+        const capacity = r.capacity ?? Number.MAX_SAFE_INTEGER;
+
+        // Wszystkie rezerwacje tego dnia dla lokalu (bez konwersji na ISO)
         const dayReservations = await this.prisma.reservation.findMany({
           where: {
             restaurantId: r.id,
             date: { gte: dayStart, lt: nextDayStart },
           },
-          select: {
-            date: true,
-            time: true,
-            people: true,
-            durationMinutes: true,
-            endAt: true,
-          },
+          select: { time: true, people: true, durationMinutes: true },
         });
 
+        // Zlicz zajęte miejsca w slocie (overlap po minutach dnia)
         let used = 0;
         for (const res of dayReservations) {
-          // Budujemy datę startu na bazie faktycznego pola date z DB + pola time
-          const resStart = new Date(
-            `${res.date.toISOString().slice(0, 10)}T${res.time}`,
-          );
-          const resEnd = new Date(res.endAt); // endAt w DB jest już pełnym DateTime
-
-          const overlap = resStart < slotEnd && resEnd > slotStart;
-          if (overlap) {
-            used += res.people;
-          }
+          const resStartMin = toMin(res.time);
+          const resEndMin =
+            resStartMin + (res.durationMinutes ?? SLOT_DURATION);
+          const overlaps = resStartMin < slotEndMin && resEndMin > slotStartMin;
+          if (overlaps) used += res.people ?? 0;
         }
 
-        const free = (r.capacity ?? 0) - used;
-        if (free >= partySize) {
-          available.push(r);
-        }
+        const free = capacity - used;
+        if (free >= partySize) available.push(r);
       }
 
       restaurants = available;
