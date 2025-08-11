@@ -87,6 +87,9 @@ export class RestaurantsService {
       const slotEnd = new Date(
         slotStart.getTime() + slotDurationMin * 60 * 1000,
       );
+      const dayStart = new Date(`${date}T00:00:00`);
+      const nextDayStart = new Date(dayStart);
+      nextDayStart.setDate(nextDayStart.getDate() + 1);
 
       // Helper do sprawdzania godzin otwarcia w formacie "HH:mm-HH:mm" (opcjonalnie)
       const withinOpeningHours = (openingHours?: string | null) => {
@@ -106,29 +109,13 @@ export class RestaurantsService {
       for (const r of restaurants) {
         if (!withinOpeningHours(r.openingHours)) continue;
 
-        // Pobierz sumę osób dla rezerwacji, które NAKŁADAJĄ się ze slotem
-        // Ponieważ masz osobno date i time, zrobimy okno:
-        // - tylko ten sam dzień
-        // - rezerwacje, których [resStart, resEnd) przecina [slotStart, slotEnd)
-
-        // Dolna granica startów, które mogą wejść w konflikt:
-        const overlapWindowStart = new Date(
-          slotStart.getTime() - slotDurationMin * 60 * 1000,
-        );
-
-        // Sprowadzamy porównania do tego samego dnia:
-        const dayStart = new Date(`${date}T00:00:00`);
-        const nextDayStart = new Date(`${date}T00:00:00`);
-        nextDayStart.setDate(nextDayStart.getDate() + 1);
-
-        // bierzemy wszystkie rezerwacje z TEGO dnia,
-        // a w warstwie aplikacyjnej odfiltrujemy te bez nakładania czasowego.
         const dayReservations = await this.prisma.reservation.findMany({
           where: {
             restaurantId: r.id,
             date: { gte: dayStart, lt: nextDayStart },
           },
           select: {
+            date: true,
             time: true,
             people: true,
             durationMinutes: true,
@@ -136,19 +123,17 @@ export class RestaurantsService {
           },
         });
 
-        // policz zajęte miejsca w slocie
         let used = 0;
         for (const res of dayReservations) {
-          // zbuduj daty start/end rezerwacji
-          const resStart = new Date(`${date}T${res.time}:00`);
-          const resDuration = res.durationMinutes ?? DEFAULT_DURATION;
-          const resEnd = res.endAt
-            ? new Date(res.endAt)
-            : new Date(resStart.getTime() + resDuration * 60 * 1000);
+          // Budujemy datę startu na bazie faktycznego pola date z DB + pola time
+          const resStart = new Date(
+            `${res.date.toISOString().slice(0, 10)}T${res.time}`,
+          );
+          const resEnd = new Date(res.endAt); // endAt w DB jest już pełnym DateTime
 
           const overlap = resStart < slotEnd && resEnd > slotStart;
           if (overlap) {
-            used += res.people ?? 0;
+            used += res.people;
           }
         }
 
