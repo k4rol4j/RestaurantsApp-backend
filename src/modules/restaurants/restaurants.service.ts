@@ -80,15 +80,14 @@ export class RestaurantsService {
     // 3) Dostępność (data + godzina + liczba osób)
     // 3) Dostępność (data + godzina + liczba osób)
     // 3) Dostępność (data + godzina + liczba osób)
+    // 3) Dostępność (data + godzina + liczba osób)
     if (date && time && partySize) {
-      const SLOT_DURATION = 120; // min – zmień jeśli u Ciebie slot ma inną długość
+      const SLOT_DURATION = 120; // min – zmień jeśli u Ciebie inna długość slotu
 
-      // Dzień do pobrania rezerwacji (lokalnie, bez ISO/UTC)
       const dayStart = new Date(`${date}T00:00:00`);
       const nextDayStart = new Date(dayStart);
       nextDayStart.setDate(nextDayStart.getDate() + 1);
 
-      // Minuty w obrębie dnia (ignorujemy sekundy)
       const toMin = (hhmm: string) => {
         const [h, m] = (hhmm ?? '00:00').slice(0, 5).split(':').map(Number);
         return (h || 0) * 60 + (m || 0);
@@ -97,11 +96,10 @@ export class RestaurantsService {
       const slotStartMin = toMin(time);
       const slotEndMin = slotStartMin + SLOT_DURATION;
 
-      // Godziny otwarcia: jeśli brak lub nie w prostym formacie "HH:mm-HH:mm" → NIE blokuj
       const withinOpeningHours = (openingHours?: string | null) => {
         if (!openingHours) return true;
         const m = openingHours.match(/\b(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\b/);
-        if (!m) return true; // nie parsujemy – nie blokujemy
+        if (!m) return true; // nie parsuje? nie blokuj
         const openMin = toMin(m[1]);
         const closeMin = toMin(m[2]);
         return slotStartMin >= openMin && slotStartMin < closeMin;
@@ -112,10 +110,17 @@ export class RestaurantsService {
       for (const r of restaurants) {
         if (!withinOpeningHours((r as any).openingHours)) continue;
 
-        // KLUCZ: jeśli capacity brak, traktuj jak „dużo miejsc”, żeby nie wycinać lokalu przez brak danych
-        const capacity = r.capacity ?? Number.MAX_SAFE_INTEGER;
+        // 1) Efektywna pojemność
+        let capacity = r.capacity ?? null;
+        if (capacity == null) {
+          const sum = await this.prisma.table.aggregate({
+            where: { restaurantId: r.id },
+            _sum: { seats: true },
+          });
+          capacity = sum._sum.seats ?? 0; // konserwatywnie: 0, czyli brak wolnych
+        }
 
-        // Rezerwacje z TEGO dnia (unikamy UTC/ISO przy overlapach)
+        // 2) Rezerwacje z TEGO dnia
         const dayReservations = await this.prisma.reservation.findMany({
           where: {
             restaurantId: r.id,
@@ -124,6 +129,7 @@ export class RestaurantsService {
           select: { time: true, people: true, durationMinutes: true },
         });
 
+        // 3) Zajętość w slocie (minuty dnia, bez endAt)
         let used = 0;
         for (const res of dayReservations) {
           const resStartMin = toMin(res.time);
