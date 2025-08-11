@@ -34,13 +34,14 @@ export class ReservationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createReservation(dto: CreateReservationDto, userId: number) {
-    const { restaurantId, date, time, people } = dto;
+    const { restaurantId, date, time, people, durationMinutes = 90 } = dto;
 
     const restaurant = await this.prisma.restaurant.findUnique({
       where: { id: restaurantId },
     });
-    if (!restaurant)
+    if (!restaurant) {
       throw new BadRequestException('Restauracja nie znaleziona');
+    }
 
     let openingHours: OpeningHours = {};
     if (restaurant.openingHours) {
@@ -85,7 +86,7 @@ export class ReservationsService {
       );
     }
 
-    // 5) Złóż pełny DateTime
+    // początek rezerwacji
     const dateObj = new Date(date);
     if (Number.isNaN(dateObj.getTime())) {
       throw new BadRequestException('Nieprawidłowa data');
@@ -93,18 +94,24 @@ export class ReservationsService {
     const [hour, minute] = tNorm.split(':').map(Number);
     dateObj.setHours(hour, minute, 0, 0);
 
-    const existing = await this.prisma.reservation.findMany({
+    // koniec rezerwacji
+    const endAt = new Date(dateObj.getTime() + durationMinutes * 60 * 1000);
+
+    // sprawdzenie kolizji czasowej
+    const overlapping = await this.prisma.reservation.findMany({
       where: {
         restaurantId,
-        date: dateObj, // timestamp z godziną
-        time: tNorm, // kolumna text
+        NOT: [
+          { endAt: { lte: dateObj } }, // kończy się przed moją
+          { date: { gte: endAt } }, // zaczyna się po mojej
+        ],
       },
       select: { people: true },
     });
 
-    const totalPeople = existing.reduce((sum, r) => sum + r.people, 0);
+    const totalPeople = overlapping.reduce((sum, r) => sum + r.people, 0);
     if (totalPeople + people > restaurant.capacity) {
-      throw new BadRequestException('Brak dostępnych miejsc o tej godzinie');
+      throw new BadRequestException('Brak dostępnych miejsc w tym czasie');
     }
 
     try {
@@ -112,9 +119,11 @@ export class ReservationsService {
         data: {
           restaurantId,
           userId,
-          date: dateObj,
+          date: dateObj, // start
           time: tNorm,
           people,
+          durationMinutes,
+          endAt,
         },
       });
     } catch (e: any) {
@@ -123,7 +132,6 @@ export class ReservationsService {
         e?.code ?? e,
         e?.meta ?? e?.message,
       );
-      console.error('Błąd zapisu rezerwacji:', e);
       throw new BadRequestException('Nie udało się utworzyć rezerwacji');
     }
   }

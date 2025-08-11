@@ -44,6 +44,8 @@ model Reservation {
   date   DateTime
   time   String
   people Int
+  durationMinutes Int       @default(90)
+  endAt        DateTime
 
   restaurantId Int
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])

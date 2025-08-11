@@ -1,4 +1,10 @@
-import { IsInt, IsString, IsDateString, Min } from 'class-validator';
+import {
+  IsInt,
+  IsString,
+  IsDateString,
+  Min,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateReservationDto {
   @IsInt()
@@ -13,4 +19,9 @@ export class CreateReservationDto {
   @IsInt()
   @Min(1)
   people: number;
+
+  @IsInt()
+  @Min(30)
+  @IsOptional()
+  durationMinutes?: number;
 }
