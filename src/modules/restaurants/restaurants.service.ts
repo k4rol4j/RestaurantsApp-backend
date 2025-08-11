@@ -12,45 +12,31 @@ export class RestaurantsService {
     const {
       cuisine,
       minRating,
-      maxRating,
-      availableDate,
       sortOrder,
       latitude,
       longitude,
       radius,
       sortByDistance,
+      date, // "YYYY-MM-DD"
+      time, // "HH:mm"
+      partySize, // liczba osób
     } = filterDto;
 
     const andConditions: Prisma.RestaurantWhereInput[] = [];
 
-    if (cuisine && cuisine.length > 0) {
+    // Kuchnie
+    if (cuisine?.length) {
       andConditions.push({
-        OR: cuisine.map((c) => ({
-          cuisine: { contains: c },
-        })),
+        OR: cuisine.map((c) => ({ cuisine: { contains: c } })),
       });
     }
 
-    if (minRating !== undefined && maxRating !== undefined) {
-      andConditions.push({
-        rating: { gte: minRating, lte: maxRating },
-      });
-    } else if (minRating !== undefined) {
-      andConditions.push({
-        rating: { gte: minRating },
-      });
-    } else if (maxRating !== undefined) {
-      andConditions.push({
-        rating: { lte: maxRating },
-      });
+    // Minimalna ocena
+    if (minRating !== undefined) {
+      andConditions.push({ rating: { gte: minRating } });
     }
 
-    if (availableDate) {
-      andConditions.push({
-        reservations: { none: { date: availableDate } },
-      });
-    }
-
+    // Geofiltrowanie
     if (
       latitude !== undefined &&
       longitude !== undefined &&
@@ -58,37 +44,121 @@ export class RestaurantsService {
     ) {
       const latDelta = radius / 111;
       const lonDelta = radius / (111 * Math.cos(latitude * (Math.PI / 180)));
-
       andConditions.push({
         latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
         longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
       });
     }
 
-    const where: Prisma.RestaurantWhereInput =
-      andConditions.length > 0 ? { AND: andConditions } : {};
+    const where: Prisma.RestaurantWhereInput = andConditions.length
+      ? { AND: andConditions }
+      : {};
 
     const orderBy: Prisma.RestaurantOrderByWithRelationInput | undefined =
       sortOrder ? { rating: sortOrder } : undefined;
 
-    let restaurants = await this.prisma.restaurant.findMany({
-      where,
-      orderBy,
-    });
+    // 1) Pobierz kandydatów
+    let restaurants = await this.prisma.restaurant.findMany({ where, orderBy });
 
+    // 2) Sortowanie po dystansie (opcjonalnie)
     if (sortByDistance && latitude !== undefined && longitude !== undefined) {
       restaurants = restaurants
         .filter((r) => r.latitude !== null && r.longitude !== null)
-        .map((restaurant) => ({
-          ...restaurant,
+        .map((r) => ({
+          ...r,
           distance: this.calculateDistance(
             latitude,
             longitude,
-            restaurant.latitude!,
-            restaurant.longitude!,
+            r.latitude!,
+            r.longitude!,
           ),
         }))
         .sort((a, b) => a.distance - b.distance);
+    }
+
+    // 3) Dostępność (data + godzina + liczba osób)
+    if (date && time && partySize) {
+      // Domyślna długość rezerwacji, jeśli rekordy nie mają ustawionego durationMinutes
+      const DEFAULT_DURATION = 120;
+
+      // Budujemy zakres slotu użytkownika
+      const slotStart = new Date(`${date}T${time}:00`);
+      const slotDurationMin = DEFAULT_DURATION; // możesz też dodać do DTO jeśli ma być zmienne
+      const slotEnd = new Date(
+        slotStart.getTime() + slotDurationMin * 60 * 1000,
+      );
+
+      // Helper do sprawdzania godzin otwarcia w formacie "HH:mm-HH:mm" (opcjonalnie)
+      const withinOpeningHours = (openingHours?: string | null) => {
+        if (!openingHours) return true;
+        const [open, close] = openingHours.split('-').map((s) => s.trim());
+        const toMin = (hhmm: string) => {
+          const [h, m] = hhmm.split(':').map(Number);
+          return h * 60 + m;
+        };
+        const [h, m] = time.split(':').map(Number);
+        const tMin = h * 60 + m;
+        return tMin >= toMin(open) && tMin < toMin(close);
+      };
+
+      const available: typeof restaurants = [];
+
+      for (const r of restaurants) {
+        if (!withinOpeningHours(r.openingHours)) continue;
+
+        // Pobierz sumę osób dla rezerwacji, które NAKŁADAJĄ się ze slotem
+        // Ponieważ masz osobno date i time, zrobimy okno:
+        // - tylko ten sam dzień
+        // - rezerwacje, których [resStart, resEnd) przecina [slotStart, slotEnd)
+
+        // Dolna granica startów, które mogą wejść w konflikt:
+        const overlapWindowStart = new Date(
+          slotStart.getTime() - slotDurationMin * 60 * 1000,
+        );
+
+        // Sprowadzamy porównania do tego samego dnia:
+        const dayStart = new Date(`${date}T00:00:00`);
+        const nextDayStart = new Date(`${date}T00:00:00`);
+        nextDayStart.setDate(nextDayStart.getDate() + 1);
+
+        // bierzemy wszystkie rezerwacje z TEGO dnia,
+        // a w warstwie aplikacyjnej odfiltrujemy te bez nakładania czasowego.
+        const dayReservations = await this.prisma.reservation.findMany({
+          where: {
+            restaurantId: r.id,
+            date: { gte: dayStart, lt: nextDayStart },
+          },
+          select: {
+            time: true,
+            people: true,
+            durationMinutes: true,
+            endAt: true,
+          },
+        });
+
+        // policz zajęte miejsca w slocie
+        let used = 0;
+        for (const res of dayReservations) {
+          // zbuduj daty start/end rezerwacji
+          const resStart = new Date(`${date}T${res.time}:00`);
+          const resDuration = res.durationMinutes ?? DEFAULT_DURATION;
+          const resEnd = res.endAt
+            ? new Date(res.endAt)
+            : new Date(resStart.getTime() + resDuration * 60 * 1000);
+
+          const overlap = resStart < slotEnd && resEnd > slotStart;
+          if (overlap) {
+            used += res.people ?? 0;
+          }
+        }
+
+        const free = (r.capacity ?? 0) - used;
+        if (free >= partySize) {
+          available.push(r);
+        }
+      }
+
+      restaurants = available;
     }
 
     return restaurants;
