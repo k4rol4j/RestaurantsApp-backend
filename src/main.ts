@@ -16,18 +16,19 @@ async function bootstrap() {
     }),
   );
   app.use(cookieParser());
+  const express = app.getHttpAdapter().getInstance();
+  express.set('trust proxy', 1);
+
+  const origins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map((o) => o.trim())
+    : ['https://restaurantsapp-frontend.onrender.com'];
+
   app.enableCors({
-    origin: 'https://restaurantsapp-frontend.onrender.com',
+    origin: origins,
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   });
-
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Credentials', 'true');
-    next();
-  });
-
   await app.listen(process.env.PORT ?? 9000);
 }
 bootstrap();

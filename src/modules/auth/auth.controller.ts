@@ -6,6 +6,7 @@ import {
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { BasicGuard } from './basic.guard';
@@ -22,21 +23,22 @@ export class AuthController {
   @UseGuards(BasicGuard)
   @HttpCode(HttpStatus.OK)
   login(@UserID() userId: number, @Res() res: Response) {
+    if (!userId) throw new UnauthorizedException();
     const token = this.tokenService.createToken(userId);
-
+    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('access-token', token, {
       httpOnly: true,
       path: '/',
       maxAge: 60 * 60 * 1000, // 1 godzina
-      sameSite: 'none',
-      secure: true,
+      sameSite: isProd ? 'none' : 'lax',
+      secure: isProd,
     });
 
     res.cookie('is-logged', true, {
       path: '/',
       maxAge: 60 * 60 * 1000,
-      sameSite: 'none',
-      secure: true,
+      sameSite: isProd ? 'none' : 'lax',
+      secure: isProd,
     });
 
     res.status(200).send({
@@ -46,6 +48,7 @@ export class AuthController {
 
   @Post('logout')
   logout(@Res() res: Response) {
+    const isProd = process.env.NODE_ENV === 'production';
     res.clearCookie('access-token', {
       path: '/',
       sameSite: 'none',
@@ -65,6 +68,6 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@Req() req) {
-    return { id: req.user.sub, email: req.user.email };
+    return { id: req.user.id, email: req.user.email, roles: req.user.roles };
   }
 }

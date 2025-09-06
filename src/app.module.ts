@@ -11,6 +11,7 @@ import { AuthController } from './auth/auth.controller';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { TablesModule } from './modules/tables/tables/tables.module';
+import { OwnerPanelModule } from './modules/owner-panel/owner-panel.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TablesModule } from './modules/tables/tables/tables.module';
     ReservationsModule,
     FavoritesModule,
     TablesModule,
+    OwnerPanelModule,
   ],
   controllers: [AppController, AuthController],
   providers: [AppService],

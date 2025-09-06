@@ -2,6 +2,19 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum Role {
+  USER
+  RESTAURANT_OWNER
+  ADMIN
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -37,6 +50,8 @@ model Restaurant {
   openingHours String?
   capacity     Int           @default(50)
   tables       Table[]
+  ownerId      Int
+  owner        User          @relation("OwnerRestaurants", fields: [ownerId], references: [id])
 }
 
 model Review {
@@ -50,7 +65,7 @@ model Review {
 
   restaurant  Restaurant   @relation(fields: [restaurantId], references: [id])
   reservation Reservation? @relation(fields: [reservationId], references: [id]) // ← relacja opcjonalna!
-  user        User?        @relation(fields: [userId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
 }
 
 model Reservation {
@@ -61,6 +76,7 @@ model Reservation {
   durationMinutes Int                @default(90)
   endAt           DateTime
   tables          ReservationTable[]
+  status          ReservationStatus  @default(PENDING)
 
   restaurantId Int
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
@@ -89,6 +105,8 @@ model User {
   reviews      Review[]
   reservations Reservation[]
   favorites    Favorite[]
+  roles        Role[]        @default([])
+  owned        Restaurant[]  @relation("OwnerRestaurants")
 }
 
 model ReservationTable {
