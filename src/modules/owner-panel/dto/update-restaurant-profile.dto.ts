@@ -38,7 +38,6 @@ export class UpdateRestaurantProfileDto {
   @IsNumber()
   longitude?: number;
 
-  // Jeśli chcesz pozwolić na edycję tych pól przez ownera:
   @IsOptional()
   @IsString()
   location?: string;
