@@ -22,9 +22,9 @@ export class AuthController {
   @Post('login')
   @UseGuards(BasicGuard)
   @HttpCode(HttpStatus.OK)
-  login(@UserID() userId: number, @Res() res: Response) {
+  async login(@UserID() userId: number, @Res() res: Response) {
     if (!userId) throw new UnauthorizedException();
-    const token = this.tokenService.createToken(userId);
+    const token = await this.tokenService.createToken(userId);
     const isProd = process.env.NODE_ENV === 'production';
     res.cookie('access-token', token, {
       httpOnly: true,
@@ -43,6 +43,7 @@ export class AuthController {
 
     res.status(200).send({
       message: 'Login successful',
+      access_token: token,
     });
   }
 
@@ -51,13 +52,13 @@ export class AuthController {
     const isProd = process.env.NODE_ENV === 'production';
     res.clearCookie('access-token', {
       path: '/',
-      sameSite: 'none',
-      secure: true,
+      sameSite: isProd ? 'none' : 'lax',
+      secure: isProd,
     });
     res.clearCookie('is-logged', {
       path: '/',
-      sameSite: 'none',
-      secure: true,
+      sameSite: isProd ? 'none' : 'lax',
+      secure: isProd,
     });
 
     res.status(200).send({
