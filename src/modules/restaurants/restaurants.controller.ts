@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Query,
   Req,
@@ -105,8 +106,8 @@ export class RestaurantsController {
     return this.restaurantService.getOwned(req.user.id);
   }
 
-  @Get(':id(\\d+)')
-  async getRestaurant(@Param('id') id: string) {
-    return this.restaurantService.getRestaurantById(Number(id));
+  @Get(':id')
+  async getRestaurant(@Param('id', ParseIntPipe) id: number) {
+    return this.restaurantService.getRestaurantById(id);
   }
 }
