@@ -105,4 +105,9 @@ export class OwnerPanelController {
       body.tableId,
     );
   }
+
+  @Get('profile')
+  getProfile(@Param('restaurantId', ParseIntPipe) restaurantId: number) {
+    return this.service.getProfile(restaurantId);
+  }
 }
