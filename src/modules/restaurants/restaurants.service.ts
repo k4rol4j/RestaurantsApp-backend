@@ -299,4 +299,11 @@ export class RestaurantsService {
       },
     });
   }
+
+  getOwned(ownerId: number) {
+    return this.prisma.restaurant.findMany({
+      where: { ownerId },
+      select: { id: true, name: true },
+    });
+  }
 }

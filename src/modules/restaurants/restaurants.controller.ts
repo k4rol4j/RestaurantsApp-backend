@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { RestaurantsService } from './restaurants.service';
@@ -13,6 +14,7 @@ import { FilterRestaurantsDto } from './dto/filter-restaurants.dto';
 import { ReviewRestaurantDto } from './dto/review-restaurant.dto';
 import { TokenGuard } from '../auth/token-guard';
 import { UserID } from '../auth/user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('restaurants')
 export class RestaurantsController {
@@ -97,7 +99,13 @@ export class RestaurantsController {
     return Array.from(citiesMap.values());
   }
 
-  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @Get('my')
+  getMyRestaurants(@Req() req) {
+    return this.restaurantService.getOwned(req.user.id);
+  }
+
+  @Get(':id(\\d+)')
   async getRestaurant(@Param('id') id: string) {
     return this.restaurantService.getRestaurantById(Number(id));
   }
