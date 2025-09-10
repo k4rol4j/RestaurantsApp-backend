@@ -31,12 +31,6 @@ export class OwnerPanelController {
     return this.service.getDashboard(restaurantId);
   }
 
-  // PROFIL
-  @Get('profile')
-  getProfile(@Param('restaurantId', ParseIntPipe) restaurantId: number) {
-    return this.service.getProfile(restaurantId);
-  }
-
   @Patch('profile')
   updateProfile(
     @Param('restaurantId', ParseIntPipe) restaurantId: number,
@@ -110,14 +104,5 @@ export class OwnerPanelController {
       reservationId,
       body.tableId,
     );
-  }
-
-  @Patch(':id/panel/profile')
-  @UseGuards(JwtAuthGuard, RestaurantOwnerGuard)
-  updateProfile(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateRestaurantProfileDto,
-  ) {
-    return this.service.updateProfile(id, dto);
   }
 }
