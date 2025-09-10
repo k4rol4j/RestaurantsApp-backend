@@ -192,25 +192,26 @@ export class RestaurantsService {
   async searchRestaurants(searchDto: any) {
     const { location, name, cuisine, latitude, longitude, radius } = searchDto;
 
-    const andConditions: Prisma.RestaurantWhereInput[] = [];
+    const and: Prisma.RestaurantWhereInput[] = [];
     const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
-    // nazwę, miasto i kuchnię szukamy bez rozróżniania wielkości liter
     if (s(name)) {
-      andConditions.push({ name: { contains: s(name), mode: 'insensitive' } });
+      and.push({ name: { contains: s(name), mode: 'insensitive' } });
     }
-    if (s(location) && !(latitude && longitude && radius)) {
-      andConditions.push({
-        location: { contains: s(location), mode: 'insensitive' },
-      });
+    if (
+      s(location) &&
+      !(
+        typeof latitude === 'number' &&
+        typeof longitude === 'number' &&
+        typeof radius === 'number'
+      )
+    ) {
+      and.push({ location: { contains: s(location), mode: 'insensitive' } });
     }
     if (s(cuisine)) {
-      andConditions.push({
-        cuisine: { contains: s(cuisine), mode: 'insensitive' },
-      });
+      and.push({ cuisine: { contains: s(cuisine), mode: 'insensitive' } });
     }
 
-    // geofiltrowanie — tylko jeśli wszystkie 3 liczby są podane
     if (
       typeof latitude === 'number' &&
       typeof longitude === 'number' &&
@@ -218,15 +219,13 @@ export class RestaurantsService {
     ) {
       const latDelta = radius / 111;
       const lonDelta = radius / (111 * Math.cos(latitude * (Math.PI / 180)));
-      andConditions.push({
+      and.push({
         latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
         longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
       });
     }
 
-    const where: Prisma.RestaurantWhereInput = andConditions.length
-      ? { AND: andConditions }
-      : {};
+    const where: Prisma.RestaurantWhereInput = and.length ? { AND: and } : {};
     return this.prisma.restaurant.findMany({ where });
   }
 
