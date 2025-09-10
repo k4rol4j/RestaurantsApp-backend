@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { FilterRestaurantsDto } from './dto/filter-restaurants.dto';
 import { ReviewRestaurantDto } from './dto/review-restaurant.dto';
+import { SearchRestaurantsDto } from './dto/search-restaurants.dto';
 
 @Injectable()
 export class RestaurantsService {
@@ -189,9 +190,8 @@ export class RestaurantsService {
     return restaurant;
   }
 
-  async searchRestaurants(searchDto: any) {
+  async searchRestaurants(searchDto: SearchRestaurantsDto) {
     const { location, name, cuisine, latitude, longitude, radius } = searchDto;
-
     const and: Prisma.RestaurantWhereInput[] = [];
     const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
