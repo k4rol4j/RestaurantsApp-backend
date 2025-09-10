@@ -191,41 +191,42 @@ export class RestaurantsService {
 
   async searchRestaurants(searchDto: any) {
     const { location, name, cuisine, latitude, longitude, radius } = searchDto;
+
     const andConditions: Prisma.RestaurantWhereInput[] = [];
+    const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
-    if (location && !(latitude && longitude && radius)) {
+    // nazwę, miasto i kuchnię szukamy bez rozróżniania wielkości liter
+    if (s(name)) {
+      andConditions.push({ name: { contains: s(name), mode: 'insensitive' } });
+    }
+    if (s(location) && !(latitude && longitude && radius)) {
       andConditions.push({
-        location: { contains: location },
+        location: { contains: s(location), mode: 'insensitive' },
       });
     }
-    if (name) {
+    if (s(cuisine)) {
       andConditions.push({
-        name: { contains: name },
-      });
-    }
-    if (cuisine) {
-      andConditions.push({
-        cuisine: { contains: cuisine },
+        cuisine: { contains: s(cuisine), mode: 'insensitive' },
       });
     }
 
+    // geofiltrowanie — tylko jeśli wszystkie 3 liczby są podane
     if (
-      latitude !== undefined &&
-      longitude !== undefined &&
-      radius !== undefined
+      typeof latitude === 'number' &&
+      typeof longitude === 'number' &&
+      typeof radius === 'number'
     ) {
       const latDelta = radius / 111;
       const lonDelta = radius / (111 * Math.cos(latitude * (Math.PI / 180)));
-
       andConditions.push({
         latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
         longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
       });
     }
 
-    const where: Prisma.RestaurantWhereInput =
-      andConditions.length > 0 ? { AND: andConditions } : {};
-
+    const where: Prisma.RestaurantWhereInput = andConditions.length
+      ? { AND: andConditions }
+      : {};
     return this.prisma.restaurant.findMany({ where });
   }
 
