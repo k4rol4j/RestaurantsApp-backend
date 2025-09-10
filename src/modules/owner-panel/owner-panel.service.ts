@@ -4,8 +4,32 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as dayjs from 'dayjs';
-import { $Enums } from '@prisma/client';
+import { $Enums, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+type MenuItem = {
+  name: string;
+  price: number;
+  category?: string;
+  description?: string;
+  isAvailable?: boolean;
+};
+
+function cleanItem(x: Partial<MenuItem>): MenuItem {
+  const name = (x.name ?? '').toString().trim();
+  const price = Number(x.price ?? 0);
+  if (!name) throw new BadRequestException('Menu item name is required');
+  if (Number.isNaN(price) || price < 0)
+    throw new BadRequestException('Menu item price must be >= 0');
+
+  return {
+    name,
+    price,
+    category: (x.category ?? '').toString().trim() || undefined,
+    description: (x.description ?? '').toString().trim() || undefined,
+    isAvailable: x.isAvailable ?? true,
+  };
+}
 
 @Injectable()
 export class OwnerPanelService {
@@ -202,5 +226,61 @@ export class OwnerPanelService {
       where: { reservationId_tableId: { reservationId, tableId } },
     });
     return { ok: true };
+  }
+
+  async getMenu(restaurantId: number): Promise<MenuItem[]> {
+    const r = await this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { menu: true },
+    });
+    return Array.isArray(r?.menu) ? (r.menu as MenuItem[]) : [];
+  }
+
+  async setMenu(restaurantId: number, items: MenuItem[]) {
+    const cleaned = items.map(cleanItem);
+    return this.prisma.restaurant.update({
+      where: { id: restaurantId },
+      data: { menu: cleaned as Prisma.InputJsonValue },
+      select: { id: true, menu: true },
+    });
+  }
+
+  async addMenuItem(restaurantId: number, item: Partial<MenuItem>) {
+    const current = await this.getMenu(restaurantId);
+    current.push(cleanItem(item));
+    return this.setMenu(restaurantId, current);
+  }
+
+  async updateMenuItem(
+    restaurantId: number,
+    index: number,
+    patch: Partial<MenuItem>,
+  ) {
+    const current = await this.getMenu(restaurantId);
+    if (index < 0 || index >= current.length)
+      throw new BadRequestException('Invalid menu item index');
+
+    const merged = { ...current[index], ...patch };
+    current[index] = cleanItem(merged);
+    return this.setMenu(restaurantId, current);
+  }
+
+  async removeMenuItem(restaurantId: number, index: number) {
+    const current = await this.getMenu(restaurantId);
+    if (index < 0 || index >= current.length)
+      throw new BadRequestException('Invalid menu item index');
+
+    current.splice(index, 1);
+    return this.setMenu(restaurantId, current);
+  }
+
+  async moveMenuItem(restaurantId: number, from: number, to: number) {
+    const arr = await this.getMenu(restaurantId);
+    if (from < 0 || from >= arr.length || to < 0 || to >= arr.length)
+      throw new BadRequestException('Invalid move indices');
+
+    const [it] = arr.splice(from, 1);
+    arr.splice(to, 0, it);
+    return this.setMenu(restaurantId, arr);
   }
 }

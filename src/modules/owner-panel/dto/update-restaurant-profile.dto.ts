@@ -1,11 +1,24 @@
 import {
+  IsArray,
+  IsBoolean,
   IsInt,
   IsNumber,
   IsOptional,
   IsString,
   Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class MenuItemDto {
+  @IsString() name!: string;
+  @IsNumber() price!: number;
+
+  @IsOptional() @IsString() category?: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsBoolean() isAvailable?: boolean;
+}
 
 export class UpdateRestaurantProfileDto {
   @IsOptional()
@@ -45,4 +58,10 @@ export class UpdateRestaurantProfileDto {
   @IsOptional()
   @IsString()
   cuisine?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MenuItemDto)
+  menu?: MenuItemDto[];
 }

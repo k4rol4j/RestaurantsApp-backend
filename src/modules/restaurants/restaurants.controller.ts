@@ -100,6 +100,12 @@ export class RestaurantsController {
     return Array.from(citiesMap.values());
   }
 
+  @Get(':id/menu')
+  async getRestaurantMenu(@Param('id', ParseIntPipe) id: number) {
+    const r = await this.restaurantService.getRestaurantById(id);
+    return Array.isArray((r as any).menu) ? (r as any).menu : [];
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('my')
   getMyRestaurants(@Req() req) {

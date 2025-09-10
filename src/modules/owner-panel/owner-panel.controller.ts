@@ -111,4 +111,13 @@ export class OwnerPanelController {
       body.tableId,
     );
   }
+
+  @Patch(':id/panel/profile')
+  @UseGuards(JwtAuthGuard, RestaurantOwnerGuard)
+  updateProfile(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateRestaurantProfileDto,
+  ) {
+    return this.service.updateProfile(id, dto);
+  }
 }
