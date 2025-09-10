@@ -3,7 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { FilterRestaurantsDto } from './dto/filter-restaurants.dto';
 import { ReviewRestaurantDto } from './dto/review-restaurant.dto';
-import { SearchRestaurantsDto } from './dto/search-restaurants.dto';
 
 @Injectable()
 export class RestaurantsService {
@@ -190,26 +189,46 @@ export class RestaurantsService {
     return restaurant;
   }
 
-  async searchRestaurants(searchDto: SearchRestaurantsDto) {
-    const { location, name, cuisine, latitude, longitude, radius } = searchDto;
-    const and: Prisma.RestaurantWhereInput[] = [];
-    const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  async searchRestaurants(searchDto: any) {
+    // BEZPIECZNE wyciąganie pól (jeśli przyszły jako tablice / inne typy)
+    const pickString = (v: unknown) =>
+      typeof v === 'string'
+        ? v.trim()
+        : Array.isArray(v)
+          ? String(v[0] ?? '').trim()
+          : '';
 
-    if (s(name)) {
-      and.push({ name: { contains: s(name), mode: 'insensitive' } });
+    const name = pickString(searchDto?.name);
+    const location = pickString(searchDto?.location);
+    const cuisine = pickString(searchDto?.cuisine);
+
+    // liczby mogą przyjść jako stringi – spróbujmy sparsować
+    const toNum = (v: unknown) =>
+      v === undefined || v === null || v === '' ? undefined : Number(v);
+    const latitude = toNum(searchDto?.latitude);
+    const longitude = toNum(searchDto?.longitude);
+    const radius = toNum(searchDto?.radius);
+
+    const and: Prisma.RestaurantWhereInput[] = [];
+
+    // ⬇️ najważniejsze: szukanie po NAZWIE, case-insensitive
+    if (name) {
+      and.push({ name: { contains: name, mode: 'insensitive' } });
     }
+
     if (
-      s(location) &&
+      location &&
       !(
         typeof latitude === 'number' &&
         typeof longitude === 'number' &&
         typeof radius === 'number'
       )
     ) {
-      and.push({ location: { contains: s(location), mode: 'insensitive' } });
+      and.push({ location: { contains: location, mode: 'insensitive' } });
     }
-    if (s(cuisine)) {
-      and.push({ cuisine: { contains: s(cuisine), mode: 'insensitive' } });
+
+    if (cuisine) {
+      and.push({ cuisine: { contains: cuisine, mode: 'insensitive' } });
     }
 
     if (
@@ -226,6 +245,7 @@ export class RestaurantsService {
     }
 
     const where: Prisma.RestaurantWhereInput = and.length ? { AND: and } : {};
+
     return this.prisma.restaurant.findMany({ where });
   }
 
