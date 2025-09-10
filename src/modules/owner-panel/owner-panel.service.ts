@@ -3,9 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import * as dayjs from 'dayjs';
 import { $Enums } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class OwnerPanelService {
@@ -82,6 +82,7 @@ export class OwnerPanelService {
         longitude: true,
         location: true,
         cuisine: true,
+        menu: true,
       },
     });
   }

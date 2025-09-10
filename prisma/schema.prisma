@@ -52,6 +52,7 @@ model Restaurant {
   tables       Table[]
   ownerId      Int
   owner        User          @relation("OwnerRestaurants", fields: [ownerId], references: [id])
+  menu         Json?
 }
 
 model Review {
