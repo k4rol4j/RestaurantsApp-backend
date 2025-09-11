@@ -1,5 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { ReservationStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma, ReservationStatus } from '@prisma/client';
 import { PrismaService } from '../modules/prisma/prisma.service';
 
 @Injectable()
@@ -89,26 +93,63 @@ export class AdminService {
     rating?: number;
     description?: string;
   }) {
-    return this.prisma.restaurant.create({
-      data: {
-        name: dto.name,
-        location: dto.location,
-        cuisine: dto.cuisine,
-        ownerId: dto.ownerId,
-        capacity: dto.capacity ?? 50,
-        rating: dto.rating ?? 0,
-        description: dto.description ?? null,
-      },
-      select: {
-        id: true,
-        name: true,
-        location: true,
-        cuisine: true,
-        rating: true,
-        ownerId: true,
-        owner: { select: { id: true, email: true } },
-      },
+    // 1) Owner MUSI istnieć
+    const owner = await this.prisma.user.findUnique({
+      where: { id: dto.ownerId },
+      select: { roles: true },
     });
+    if (!owner) {
+      throw new NotFoundException('Właściciel (ownerId) nie istnieje');
+    }
+
+    // 2) (opcjonalnie) dopisz rolę OWNER, jeśli jej nie ma
+    if (!owner.roles.includes('RESTAURANT_OWNER')) {
+      await this.prisma.user.update({
+        where: { id: dto.ownerId },
+        data: {
+          roles: {
+            set: Array.from(new Set([...owner.roles, 'RESTAURANT_OWNER'])),
+          },
+        },
+      });
+    }
+
+    // 3) Tworzenie + czytelne błędy
+    try {
+      return await this.prisma.restaurant.create({
+        data: {
+          name: dto.name.trim(),
+          location: dto.location.trim(),
+          cuisine: dto.cuisine.trim(),
+          ownerId: dto.ownerId,
+          capacity: dto.capacity ?? 50,
+          rating: dto.rating ?? 0,
+          description: dto.description ?? null,
+        },
+        select: {
+          id: true,
+          name: true,
+          location: true,
+          cuisine: true,
+          rating: true,
+          ownerId: true,
+          owner: { select: { id: true, email: true } },
+        },
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        if (e.code === 'P2003') {
+          // Foreign key failed
+          throw new BadRequestException(
+            'Nieprawidłowy ownerId (nie przechodzi FK)',
+          );
+        }
+        if (e.code === 'P2002') {
+          throw new BadRequestException('Konflikt unikalności (P2002)');
+        }
+      }
+      throw e;
+    }
   }
 
   async deleteRestaurant(id: number) {
