@@ -12,6 +12,7 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { TablesModule } from './modules/tables/tables/tables.module';
 import { OwnerPanelModule } from './modules/owner-panel/owner-panel.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { OwnerPanelModule } from './modules/owner-panel/owner-panel.module';
     FavoritesModule,
     TablesModule,
     OwnerPanelModule,
+    AdminModule,
   ],
   controllers: [AppController, AuthController],
   providers: [AppService],
