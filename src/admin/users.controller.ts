@@ -1,20 +1,18 @@
 import {
-  Body,
   Controller,
   Get,
-  Param,
-  ParseIntPipe,
   Patch,
   Put,
+  Param,
+  ParseIntPipe,
   Query,
+  Body,
   UseGuards,
 } from '@nestjs/common';
-import { AdminService } from './admin.service';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { AuthGuard } from '@nestjs/passport';
-import { SetRolesDto } from './dto/set-roles.dto';
-import { ChangeOneRoleDto } from './dto/change-one-role.dto';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { AdminService } from './admin.service';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles('ADMIN')
@@ -22,9 +20,10 @@ import { ChangeOneRoleDto } from './dto/change-one-role.dto';
 export class AdminUsersController {
   constructor(private readonly admin: AdminService) {}
 
+  // GET /admin/users?q=&skip=0&take=20
   @Get()
   async list(
-    @Query('q') q?: string,
+    @Query('q') q = '',
     @Query('skip') skip = '0',
     @Query('take') take = '20',
   ) {
@@ -36,16 +35,21 @@ export class AdminUsersController {
     return { items, total };
   }
 
-  @Put(':id/roles')
-  setRoles(@Param('id', ParseIntPipe) id: number, @Body() dto: SetRolesDto) {
-    return this.admin.setRoles(id, dto.roles as any);
+  // PATCH /admin/users/:id/role  { role, add }
+  @Patch(':id/role')
+  async toggleRole(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { role: 'ADMIN' | 'RESTAURANT_OWNER' | 'USER'; add: boolean },
+  ) {
+    return this.admin.toggleOneRole(id, body.role, body.add);
   }
 
-  @Patch(':id/role')
-  changeOne(
+  // PUT /admin/users/:id/roles   { roles: [...] }
+  @Put(':id/roles')
+  async setRoles(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: ChangeOneRoleDto,
+    @Body() body: { roles: ('ADMIN' | 'RESTAURANT_OWNER' | 'USER')[] },
   ) {
-    return this.admin.changeOneRole(id, dto.role as any, dto.add);
+    return this.admin.setRoles(id, body.roles);
   }
 }

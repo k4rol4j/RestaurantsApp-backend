@@ -9,10 +9,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { AdminService } from './admin.service';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { AdminService } from './admin.service';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -23,7 +23,7 @@ export class AdminRestaurantsController {
 
   @Get()
   async list(
-    @Query('q') q?: string,
+    @Query('q') q = '',
     @Query('skip') skip = '0',
     @Query('take') take = '20',
   ) {
@@ -36,7 +36,7 @@ export class AdminRestaurantsController {
   }
 
   @Post()
-  async create(@Body() dto: CreateRestaurantDto) {
+  create(@Body() dto: CreateRestaurantDto) {
     return this.admin.createRestaurant(dto);
   }
 
