@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ReservationStatus, Role } from '@prisma/client';
 import { PrismaService } from '../modules/prisma/prisma.service';
+import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 
 @Injectable()
 export class AdminService {
@@ -61,6 +62,29 @@ export class AdminService {
         where: q ? { name: { contains: q, mode: 'insensitive' } } : undefined,
       }),
     ]);
+  }
+
+  async createRestaurant(dto: CreateRestaurantDto) {
+    return this.prisma.restaurant.create({
+      data: {
+        name: dto.name,
+        location: dto.location,
+        cuisine: dto.cuisine,
+        ownerId: dto.ownerId,
+        capacity: dto.capacity ?? 50,
+        rating: dto.rating ?? 0,
+        description: dto.description ?? null,
+      },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        cuisine: true,
+        rating: true,
+        ownerId: true,
+        owner: { select: { id: true, email: true } },
+      },
+    });
   }
 
   async deleteRestaurant(id: number) {

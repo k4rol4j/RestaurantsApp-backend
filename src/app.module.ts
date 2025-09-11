@@ -7,12 +7,11 @@ import { ConfigModule } from '@nestjs/config';
 import { TokenModule } from './modules/token/token.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { AuthController } from './auth/auth.controller';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { TablesModule } from './modules/tables/tables/tables.module';
 import { OwnerPanelModule } from './modules/owner-panel/owner-panel.module';
-import { AdminModule } from './admin/admin.module';
+import { AuthController } from './modules/auth/auth.controller';
 
 @Module({
   imports: [
@@ -26,9 +25,8 @@ import { AdminModule } from './admin/admin.module';
     FavoritesModule,
     TablesModule,
     OwnerPanelModule,
-    AdminModule,
   ],
-  controllers: [AppController, AuthController],
+  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
