@@ -76,13 +76,8 @@ export class RestaurantsService {
         .sort((a, b) => a.distance - b.distance);
     }
 
-    // 3) Dostępność (data + godzina + liczba osób)
-    // 3) Dostępność (data + godzina + liczba osób)
-    // 3) Dostępność (data + godzina + liczba osób)
-    // 3) Dostępność (data + godzina + liczba osób)
-    // 3) Dostępność (data + godzina + liczba osób)
     if (date && time && partySize) {
-      const SLOT_DURATION = 120; // min – zmień jeśli u Ciebie inna długość slotu
+      const SLOT_DURATION = 120;
 
       const dayStart = new Date(`${date}T00:00:00`);
       const nextDayStart = new Date(dayStart);
