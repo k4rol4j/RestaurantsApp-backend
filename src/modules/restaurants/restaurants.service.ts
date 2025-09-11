@@ -190,7 +190,6 @@ export class RestaurantsService {
   }
 
   async searchRestaurants(searchDto: any) {
-    // BEZPIECZNE wyciąganie pól (jeśli przyszły jako tablice / inne typy)
     const pickString = (v: unknown) =>
       typeof v === 'string'
         ? v.trim()
@@ -202,20 +201,21 @@ export class RestaurantsService {
     const location = pickString(searchDto?.location);
     const cuisine = pickString(searchDto?.cuisine);
 
-    // liczby mogą przyjść jako stringi – spróbujmy sparsować
+    // Liczby mogą przyjść jako stringi
     const toNum = (v: unknown) =>
       v === undefined || v === null || v === '' ? undefined : Number(v);
+
     const latitude = toNum(searchDto?.latitude);
     const longitude = toNum(searchDto?.longitude);
     const radius = toNum(searchDto?.radius);
 
     const and: Prisma.RestaurantWhereInput[] = [];
 
-    // ⬇️ najważniejsze: szukanie po NAZWIE, case-insensitive
     if (name) {
       and.push({ name: { contains: name, mode: 'insensitive' } });
     }
 
+    // Lokalizacja tylko, gdy NIE ma geofiltra
     if (
       location &&
       !(
@@ -245,6 +245,7 @@ export class RestaurantsService {
     }
 
     const where: Prisma.RestaurantWhereInput = and.length ? { AND: and } : {};
+    console.log('[SEARCH] where =', JSON.stringify(where));
 
     return this.prisma.restaurant.findMany({ where });
   }
