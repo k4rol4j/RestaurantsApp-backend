@@ -31,7 +31,7 @@ export class AuthController {
       path: '/',
       maxAge: 60 * 60 * 1000, // 1 godzina
       sameSite: isProd ? 'none' : 'lax',
-      secure: isProd,
+      secure: true,
     });
 
     res.cookie('is-logged', true, {
