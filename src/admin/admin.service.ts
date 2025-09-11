@@ -204,12 +204,14 @@ export class AdminService {
     return [items, total] as const;
   }
 
-  async cancelReservation(id: number) {
-    return this.prisma.reservation.update({
-      where: { id },
-      data: { status: ReservationStatus.CANCELLED },
-      select: { id: true, status: true },
+  async deleteReservation(id: number) {
+    // usuń ewentualną recenzję powiązaną FK (reservationId jest unique w Review)
+    await this.prisma.review.deleteMany({ where: { reservationId: id } });
+    // dla pewności usuń też powiązania stolików (mimo onDelete: Cascade)
+    await this.prisma.reservationTable.deleteMany({
+      where: { reservationId: id },
     });
+    await this.prisma.reservation.delete({ where: { id } });
   }
 
   // -------------- REVIEWS --------------

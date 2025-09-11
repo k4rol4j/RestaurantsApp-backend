@@ -179,12 +179,29 @@ export class OwnerPanelService {
   ) {
     const r = await this.prisma.reservation.findUnique({
       where: { id: reservationId },
+      select: { restaurantId: true },
     });
-    if (!r || r.restaurantId !== restaurantId)
+    if (!r || r.restaurantId !== restaurantId) {
       throw new NotFoundException('Reservation not found');
-    return this.prisma.reservation.update({
-      where: { id: reservationId },
-      data: { status },
+    }
+
+    // jeśli status to CANCELLED/REJECTED → zwolnij wszystkie stoliki powiązane z rezerwacją
+    const shouldFreeTables =
+      status === $Enums.ReservationStatus.CANCELLED ||
+      status === $Enums.ReservationStatus.REJECTED;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (shouldFreeTables) {
+        await tx.reservationTable.deleteMany({
+          where: { reservationId },
+        });
+      }
+      // na końcu ustaw status
+      return tx.reservation.update({
+        where: { id: reservationId },
+        data: { status },
+        select: { id: true, status: true },
+      });
     });
   }
 

@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Query,
   UseGuards,
+  Delete,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -42,8 +43,9 @@ export class AdminReservationsController {
   }
 
   // PATCH /api/admin/reservations/:id/cancel
-  @Patch(':id/cancel')
-  async cancel(@Param('id', ParseIntPipe) id: number) {
-    return this.admin.cancelReservation(id);
+  @Delete(':id')
+  async hardDelete(@Param('id', ParseIntPipe) id: number) {
+    await this.admin.deleteReservation(id);
+    return { ok: true };
   }
 }

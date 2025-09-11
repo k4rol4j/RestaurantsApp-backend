@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { ReservationStatus } from '@prisma/client';
 
 type OpeningHours = {
   [day: string]: {
@@ -236,36 +237,46 @@ export class ReservationsService {
 
   async getReservationsByUser(userId: number) {
     return this.prisma.reservation.findMany({
-      where: { userId },
+      where: {
+        userId,
+        status: { not: ReservationStatus.CANCELLED }, // <— klucz
+        // jeśli chcesz schować też REJECTED:
+        // status: { notIn: [ReservationStatus.CANCELLED, ReservationStatus.REJECTED] }
+      },
       include: {
         restaurant: true,
         review: true,
-        tables: { include: { table: true } }, // pokaż przypisane stoliki
+        tables: { include: { table: true } },
       },
       orderBy: { date: 'desc' },
     });
   }
 
   async cancelReservation(reservationId: number, userId: number) {
-    const reservation = await this.prisma.reservation.findUnique({
+    const r = await this.prisma.reservation.findUnique({
       where: { id: reservationId },
+      select: { userId: true, status: true, date: true },
     });
 
-    if (!reservation) {
-      throw new ForbiddenException('Rezerwacja nie istnieje.');
-    }
-
-    if (reservation.userId !== userId) {
-      throw new ForbiddenException('Nie możesz usunąć cudzej rezerwacji.');
-    }
-
-    // Opcjonalnie: blokada usuwania przeszłych rezerwacji
-    if (reservation.date < new Date()) {
+    if (!r) throw new ForbiddenException('Rezerwacja nie istnieje.');
+    if (r.userId !== userId)
+      throw new ForbiddenException('Nie możesz anulować cudzej rezerwacji.');
+    if (r.date < new Date())
       throw new ForbiddenException('Nie można anulować przeszłej rezerwacji.');
+    if (r.status !== ReservationStatus.PENDING) {
+      throw new BadRequestException(
+        'Można anulować tylko rezerwacje oczekujące (PENDING).',
+      );
     }
 
-    return this.prisma.reservation.delete({
+    // zwolnij stoliki przypięte do tej rezerwacji
+    await this.prisma.reservationTable.deleteMany({ where: { reservationId } });
+
+    // soft-cancel
+    return this.prisma.reservation.update({
       where: { id: reservationId },
+      data: { status: ReservationStatus.CANCELLED },
+      select: { id: true, status: true },
     });
   }
 }
