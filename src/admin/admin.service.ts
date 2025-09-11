@@ -137,18 +137,17 @@ export class AdminService {
         },
       });
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError) {
-        if (e.code === 'P2003') {
-          // Foreign key failed
-          throw new BadRequestException(
-            'Nieprawidłowy ownerId (nie przechodzi FK)',
-          );
-        }
-        if (e.code === 'P2002') {
-          throw new BadRequestException('Konflikt unikalności (P2002)');
-        }
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        const target = Array.isArray((e.meta as any)?.target)
+          ? (e.meta as any).target.join(', ')
+          : String((e.meta as any)?.target ?? '');
+        throw new BadRequestException(
+          `Konflikt unikalności dla: ${target || 'nieznane pole'}`,
+        );
       }
-      throw e;
     }
   }
 
