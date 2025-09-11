@@ -18,7 +18,6 @@ import { AdminService } from './admin.service';
 export class AdminReservationsController {
   constructor(private readonly admin: AdminService) {}
 
-  // GET /admin/reservations?from=YYYY-MM-DD&to=YYYY-MM-DD&status=...&userId=...&restaurantId=...&skip=0&take=20
   @Get()
   async list(
     @Query('from') from?: string, // <-- string, nie Date
@@ -30,8 +29,8 @@ export class AdminReservationsController {
     @Query('take') take = '20',
   ) {
     const [items, total] = await this.admin.listReservations({
-      from, // <-- przekazujemy string
-      to, // <-- przekazujemy string
+      from,
+      to,
       status,
       userId: userId ? Number(userId) : undefined,
       restaurantId: restaurantId ? Number(restaurantId) : undefined,
