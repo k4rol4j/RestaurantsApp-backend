@@ -18,10 +18,11 @@ import { AdminService } from './admin.service';
 export class AdminReservationsController {
   constructor(private readonly admin: AdminService) {}
 
+  // GET /api/admin/reservations?from=&to=&status=&userId=&restaurantId=&skip=&take=
   @Get()
   async list(
-    @Query('from') from?: string, // <-- string, nie Date
-    @Query('to') to?: string, // <-- string, nie Date
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('status') status?: string,
     @Query('userId') userId?: string,
     @Query('restaurantId') restaurantId?: string,
@@ -40,6 +41,7 @@ export class AdminReservationsController {
     return { items, total };
   }
 
+  // PATCH /api/admin/reservations/:id/cancel
   @Patch(':id/cancel')
   async cancel(@Param('id', ParseIntPipe) id: number) {
     return this.admin.cancelReservation(id);

@@ -7,10 +7,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { AdminService } from './admin.service';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { AdminService } from './admin.service';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles('ADMIN')
@@ -18,24 +18,26 @@ import { AuthGuard } from '@nestjs/passport';
 export class AdminReviewsController {
   constructor(private readonly admin: AdminService) {}
 
+  // GET /api/admin/reviews?restaurantId=&userId=&skip=&take=
   @Get()
   async list(
-    @Query('userId') userId?: string,
     @Query('restaurantId') restaurantId?: string,
+    @Query('userId') userId?: string,
     @Query('skip') skip = '0',
     @Query('take') take = '20',
   ) {
     const [items, total] = await this.admin.listReviews({
-      userId: userId ? Number(userId) : undefined,
       restaurantId: restaurantId ? Number(restaurantId) : undefined,
+      userId: userId ? Number(userId) : undefined,
       skip: Number(skip),
       take: Number(take),
     });
     return { items, total };
   }
 
+  // DELETE /api/admin/reviews/:id
   @Delete(':id')
-  delete(@Param('id', ParseIntPipe) id: number) {
+  async remove(@Param('id', ParseIntPipe) id: number) {
     return this.admin.deleteReview(id);
   }
 }
