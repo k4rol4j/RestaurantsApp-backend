@@ -8,10 +8,8 @@ import type { Request, Response } from 'express';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // /api/... jako prefix
   app.setGlobalPrefix('api');
 
-  // Walidacja
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -20,25 +18,22 @@ async function bootstrap() {
     }),
   );
 
-  // Cookies
   app.use(cookieParser());
 
-  // Express adapter (np. do preflight)
   const express = app.getHttpAdapter().getInstance();
   express.set('trust proxy', 1);
 
-  // Whitelist frontów (z .env FRONTEND_URL="https://foo,https://bar")
+  // Whitelist frontu (lub z ENV FRONTEND_URL="https://foo,https://bar")
   const whitelist = process.env.FRONTEND_URL?.split(',')
     .map((o) => o.trim())
     .filter(Boolean) ?? ['https://restaurantsapp-frontend.onrender.com'];
-
   const FALLBACK_ORIGIN = whitelist[0];
 
-  // --- 1) TWARDY PRE-FLIGHT: odpowiadamy na OPTIONS zawsze z właściwymi nagłówkami ---
-  express.options('*', (req: Request, res: Response) => {
-    // iOS PWA często wysyła Origin: null — wtedy używamy FALLBACK_ORIGIN
+  // --- Globalny middleware CORS (działa także dla Origin:null i preflight) ---
+  express.use((req: Request, res: Response, next) => {
     const reqOrigin = req.headers.origin || FALLBACK_ORIGIN;
 
+    // Ustaw nagłówki na KAŻDE żądanie
     res.setHeader('Access-Control-Allow-Origin', reqOrigin);
     res.setHeader('Vary', 'Origin'); // ważne przy dynamicznym origin
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -50,14 +45,18 @@ async function bootstrap() {
       'Access-Control-Allow-Headers',
       'Content-Type, Authorization, X-Requested-With',
     );
-    res.sendStatus(204);
+
+    if (req.method === 'OPTIONS') {
+      // Preflight kończymy tutaj
+      return res.sendStatus(204);
+    }
+    next();
   });
 
-  // --- 2) Standardowe CORS dla zwykłych żądań ---
+  // --- Standardowe CORS Nest (whitelist + credentials) ---
   app.enableCors({
     origin: (origin, cb) => {
-      // iOS PWA / narzędzia / healthchecks: Origin bywa null -> zezwalamy
-      if (!origin) return cb(null, true);
+      if (!origin) return cb(null, true); // iOS PWA / narzędzia
       if (whitelist.includes(origin)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'), false);
     },
