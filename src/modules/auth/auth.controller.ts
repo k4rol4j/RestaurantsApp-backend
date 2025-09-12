@@ -30,14 +30,14 @@ export class AuthController {
       httpOnly: true,
       path: '/',
       maxAge: 60 * 60 * 1000, // 1 godzina
-      sameSite: isProd ? 'none' : 'lax',
+      sameSite: 'none',
       secure: true,
     });
 
     res.cookie('is-logged', true, {
       path: '/',
       maxAge: 60 * 60 * 1000,
-      sameSite: isProd ? 'none' : 'lax',
+      sameSite: 'none',
       secure: true,
     });
 
@@ -52,12 +52,12 @@ export class AuthController {
     const isProd = process.env.NODE_ENV === 'production';
     res.clearCookie('access-token', {
       path: '/',
-      sameSite: isProd ? 'none' : 'lax',
+      sameSite: 'none',
       secure: true,
     });
     res.clearCookie('is-logged', {
       path: '/',
-      sameSite: isProd ? 'none' : 'lax',
+      sameSite: 'none',
       secure: true,
     });
 
