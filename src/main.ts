@@ -24,7 +24,12 @@ async function bootstrap() {
     : ['https://restaurantsapp-frontend.onrender.com'];
 
   app.enableCors({
-    origin: origins,
+    origin: (origin, cb) => {
+      // iOS PWA / cURL / healthchecks często mają null/undefined
+      if (!origin) return cb(null, true);
+      if (origins.includes(origin)) return cb(null, true);
+      return cb(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],

@@ -38,7 +38,7 @@ export class AuthController {
       path: '/',
       maxAge: 60 * 60 * 1000,
       sameSite: isProd ? 'none' : 'lax',
-      secure: isProd,
+      secure: true,
     });
 
     res.status(200).send({
@@ -53,12 +53,12 @@ export class AuthController {
     res.clearCookie('access-token', {
       path: '/',
       sameSite: isProd ? 'none' : 'lax',
-      secure: isProd,
+      secure: true,
     });
     res.clearCookie('is-logged', {
       path: '/',
       sameSite: isProd ? 'none' : 'lax',
-      secure: isProd,
+      secure: true,
     });
 
     res.status(200).send({
