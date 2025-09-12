@@ -69,4 +69,34 @@ export class AuthController {
   me(@Req() req) {
     return { id: req.user.id, email: req.user.email, roles: req.user.roles };
   }
+
+  // 1) Ustaw testowe cookie "probe" (nie httpOnly, żeby było w document.cookie) i zwróć to, co ustawia serwer
+  @Get('debug/set-probe')
+  setProbe(@Res() res: Response) {
+    res.cookie('probe', 'ok', {
+      path: '/',
+      maxAge: 10 * 60 * 1000,
+      sameSite: 'none',
+      secure: true,
+    });
+    res.cookie('access-token-probe', 'x', {
+      // DOD. test httpOnly=FALSE
+      path: '/',
+      maxAge: 10 * 60 * 1000,
+      sameSite: 'none',
+      secure: true,
+      // httpOnly: true  // zostaw domyślne (false), żeby było widoczne w JS
+    });
+    return res.status(200).json({ message: 'probe-set' });
+  }
+
+  // 2) Pokaż co PRZYCHODZI od klienta w ciasteczkach i nagłówkach
+  @Get('debug/echo')
+  echo(@Req() req) {
+    return {
+      origin: req.headers.origin || null,
+      cookieHeader: req.headers.cookie || null,
+      ua: req.headers['user-agent'] || null,
+    };
+  }
 }
