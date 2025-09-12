@@ -25,7 +25,6 @@ export class AuthController {
   async login(@UserID() userId: number, @Res() res: Response) {
     if (!userId) throw new UnauthorizedException();
     const token = await this.tokenService.createToken(userId);
-    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('access-token', token, {
       httpOnly: true,
       path: '/',
@@ -34,7 +33,7 @@ export class AuthController {
       secure: true,
     });
 
-    res.cookie('is-logged', true, {
+    res.cookie('is-logged', '1', {
       path: '/',
       maxAge: 60 * 60 * 1000,
       sameSite: 'none',
@@ -49,7 +48,6 @@ export class AuthController {
 
   @Post('logout')
   logout(@Res() res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
     res.clearCookie('access-token', {
       path: '/',
       sameSite: 'none',
