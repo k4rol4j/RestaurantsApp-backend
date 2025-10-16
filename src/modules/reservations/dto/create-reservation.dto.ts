@@ -24,4 +24,6 @@ export class CreateReservationDto {
   @Min(30)
   @IsOptional()
   durationMinutes?: number;
+
+  tableId?: number;
 }

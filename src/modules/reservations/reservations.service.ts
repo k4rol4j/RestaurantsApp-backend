@@ -152,6 +152,59 @@ export class ReservationsService {
       );
     }
 
+    // [MANUALNY WYBÓR STOLIKA]
+    if (dto.tableId) {
+      // 1) policz stoliki zajęte w tym oknie czasu
+      const overlapping = await this.prisma.reservationTable.findMany({
+        where: {
+          reservation: {
+            restaurantId,
+            status: { in: ['PENDING', 'CONFIRMED'] },
+            AND: [{ date: { lt: endAt } }, { endAt: { gt: startAt } }], // overlap
+          },
+        },
+        select: { tableId: true },
+      });
+      const busyIds = new Set(overlapping.map((r) => r.tableId));
+
+      // 2) sprawdź, czy dany stolik pasuje (restauracja, aktywny, seats==people) i NIE jest zajęty
+      const tableOk = await this.prisma.table.findFirst({
+        where: {
+          restaurantId,
+          isActive: true,
+          seats: people,
+          AND: [
+            { id: dto.tableId },
+            busyIds.size ? { id: { notIn: Array.from(busyIds) } } : {},
+          ],
+        },
+        select: { id: true },
+      });
+
+      if (!tableOk) throw new BadRequestException('Table not available');
+
+      // 3) zapis rezerwacji + przypięcie stolika
+      return this.prisma.$transaction(async (tx) => {
+        const reservation = await tx.reservation.create({
+          data: {
+            restaurantId,
+            userId,
+            date: startAt, // u Ciebie "date" = start
+            time: tNorm,
+            people,
+            durationMinutes,
+            endAt,
+          },
+        });
+
+        await tx.reservationTable.create({
+          data: { reservationId: reservation.id, tableId: dto.tableId! },
+        });
+
+        return reservation;
+      });
+    }
+
     // 4) Wolne stoliki (brak nakładających się rezerwacji)
     const freeTables = await this.prisma.table.findMany({
       where: {

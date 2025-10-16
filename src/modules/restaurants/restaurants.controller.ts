@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -115,5 +116,29 @@ export class RestaurantsController {
   @Get(':id')
   async getRestaurant(@Param('id', ParseIntPipe) id: number) {
     return this.restaurantService.getRestaurantById(id);
+  }
+
+  // GET /restaurants/:id/available-tables?start=2025-09-12T19:00:00Z&end=2025-09-12T20:30:00Z&people=2
+  @Get(':id/available-tables')
+  async availableTables(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('start') startISO: string,
+    @Query('end') endISO: string,
+    @Query('people', ParseIntPipe) people: number,
+  ) {
+    if (!startISO || !endISO || !people) {
+      throw new BadRequestException('Missing start/end/people');
+    }
+    const start = new Date(startISO);
+    const end = new Date(endISO);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start >= end) {
+      throw new BadRequestException('Invalid start/end');
+    }
+    return this.restaurantService.findAvailableTables({
+      restaurantId: id,
+      start,
+      end,
+      people,
+    });
   }
 }

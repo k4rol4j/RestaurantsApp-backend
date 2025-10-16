@@ -8,6 +8,46 @@ import { ReviewRestaurantDto } from './dto/review-restaurant.dto';
 export class RestaurantsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findAvailableTables(params: {
+    restaurantId: number;
+    start: Date; // start rezerwacji
+    end: Date; // koniec rezerwacji
+    people: number;
+  }) {
+    const { restaurantId, start, end, people } = params;
+
+    // 1) Znajdź stoliki zajęte przez rezerwacje, które NAKŁADAJĄ się na [start, end)
+    // Uwaga: używamy Twoich pól: reservation.date (start) i reservation.endAt (koniec)
+    const overlapping = await this.prisma.reservationTable.findMany({
+      where: {
+        reservation: {
+          restaurantId,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          AND: [
+            { date: { lt: end } }, // rez.start < end
+            { endAt: { gt: start } }, // rez.end   > start
+          ],
+        },
+      },
+      select: { tableId: true },
+    });
+
+    const busyIds = Array.from(new Set(overlapping.map((r) => r.tableId)));
+
+    // 2) Zwróć wolne stoliki o DOKŁADNIE tej liczbie miejsc (seats === people)
+    //    (Jeśli chcesz dopuścić większe, zmień na: seats: { gte: people })
+    return this.prisma.table.findMany({
+      where: {
+        restaurantId,
+        isActive: true,
+        seats: people,
+        id: busyIds.length ? { notIn: busyIds } : undefined,
+      },
+      select: { id: true, name: true, seats: true },
+      orderBy: [{ seats: 'asc' }, { name: 'asc' }],
+    });
+  }
+
   async filterRestaurants(filterDto: FilterRestaurantsDto) {
     const {
       cuisine,

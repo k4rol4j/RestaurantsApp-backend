@@ -151,7 +151,7 @@ export class OwnerPanelService {
   }
 
   // Reservations
-  listReservations(
+  async listReservations(
     restaurantId: number,
     q: { date?: string; status?: $Enums.ReservationStatus },
   ) {
@@ -165,10 +165,18 @@ export class OwnerPanelService {
         lte: d.endOf('day').toDate(),
       };
     }
+
     return this.prisma.reservation.findMany({
       where,
       orderBy: { date: 'asc' },
-      select: { id: true, date: true, time: true, people: true, status: true },
+      include: {
+        tables: {
+          include: {
+            table: { select: { id: true, name: true, seats: true } },
+          },
+        },
+        user: { select: { email: true } },
+      },
     });
   }
 
@@ -211,21 +219,30 @@ export class OwnerPanelService {
     tableId: number,
   ) {
     const [rsv, tbl] = await Promise.all([
-      this.prisma.reservation.findUnique({ where: { id: reservationId } }),
+      this.prisma.reservation.findUnique({
+        where: { id: reservationId },
+        include: { tables: true },
+      }),
       this.prisma.table.findUnique({ where: { id: tableId } }),
     ]);
+
     if (!rsv || rsv.restaurantId !== restaurantId)
       throw new NotFoundException('Reservation not found');
     if (!tbl || tbl.restaurantId !== restaurantId)
       throw new NotFoundException('Table not found');
     if (!tbl.isActive) throw new BadRequestException('Table inactive');
 
-    try {
-      await this.prisma.reservationTable.create({
-        data: { reservationId, tableId },
-      });
-    } catch {}
-    return { ok: true };
+    // 🔸 nie dodawaj drugi raz tego samego stolika
+    const already = rsv.tables.some((t) => t.tableId === tableId);
+    if (already) {
+      return { ok: true, message: 'Table already assigned' };
+    }
+
+    await this.prisma.reservationTable.create({
+      data: { reservationId, tableId },
+    });
+
+    return { ok: true, message: 'Table assigned' };
   }
 
   async unassignTable(
@@ -239,10 +256,10 @@ export class OwnerPanelService {
     if (!rsv || rsv.restaurantId !== restaurantId)
       throw new NotFoundException('Reservation not found');
 
-    await this.prisma.reservationTable.delete({
-      where: { reservationId_tableId: { reservationId, tableId } },
+    await this.prisma.reservationTable.deleteMany({
+      where: { reservationId, tableId },
     });
-    return { ok: true };
+    return { ok: true, message: 'Table unassigned' };
   }
 
   async getMenu(restaurantId: number): Promise<MenuItem[]> {
