@@ -35,8 +35,8 @@ async function bootstrap() {
       // 1) Brak nagłówka Origin (np. curl/postman/same-origin) – OK
       if (!origin) return cb(null, true);
 
-      // 2) PWA / iOS: literalny 'null' – ustaw ACAO na 'null'
-      if (origin === 'null') return cb(null, 'null');
+      // 2) PWA / iOS: literalny 'null' – dopuść z domyślnym (FALLBACK) originem
+      if (origin === 'null') return cb(null, FALLBACK_ORIGIN);
 
       // 3) Biała lista (ENV FRONTEND_URL="https://foo,https://bar")
       if (whitelist.includes(origin)) return cb(null, origin);
