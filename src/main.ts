@@ -4,13 +4,19 @@ import { ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { existsSync } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api');
+  app.use(cookieParser());
 
+  // ✅ Public folder (np. /images/logo_restaurants)
+  app.useStaticAssets(join(__dirname, '..', 'public'), {
+    prefix: '/',
+  });
+
+  // ✅ Globalne walidacje DTO
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -19,31 +25,32 @@ async function bootstrap() {
     }),
   );
 
-  app.use(cookieParser());
-
-  const publicPath = join(__dirname, '..', 'public');
-  console.log('Static from:', publicPath, 'exists:', existsSync(publicPath));
-  app.useStaticAssets(publicPath, { prefix: '/' });
-
+  // 🔧 CORS KONFIG
   const whitelist = [
     'https://restaurantsapp-frontend.onrender.com',
-    'http://localhost:5173',
+    'http://localhost:5173', // dla testów lokalnych
   ];
-  const FALLBACK_ORIGIN = whitelist[0];
 
   app.enableCors({
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (origin === 'null') return cb(null, FALLBACK_ORIGIN);
-      if (whitelist.includes(origin)) return cb(null, origin);
-      return cb(new Error('Not allowed by CORS'), false);
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // same-origin / Postman
+      if (whitelist.includes(origin)) return callback(null, origin);
+      console.warn('❌ Blocked by CORS:', origin);
+      return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+    ],
   });
+
+  const express = app.getHttpAdapter().getInstance();
+  express.set('trust proxy', 1);
 
   await app.listen(process.env.PORT ?? 9000, '0.0.0.0');
 }
-
 bootstrap();
