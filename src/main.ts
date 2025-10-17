@@ -1,12 +1,12 @@
-// src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
-import type { Request, Response } from 'express';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api');
 
@@ -20,6 +20,11 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  // ✅ udostępnij folder public, żeby działały np. /images/logo_restaurants/ciao.png
+  app.useStaticAssets(join(__dirname, '..', 'public'), {
+    prefix: '/', // dostępne np. pod /images/...
+  });
+
   const express = app.getHttpAdapter().getInstance();
   express.set('trust proxy', 1);
 
@@ -27,6 +32,7 @@ async function bootstrap() {
   const whitelist = process.env.FRONTEND_URL?.split(',')
     .map((o) => o.trim())
     .filter(Boolean) ?? ['https://restaurantsapp-frontend.onrender.com'];
+
   const FALLBACK_ORIGIN = whitelist[0];
 
   // --- Standardowe CORS Nest (whitelist + credentials) ---
