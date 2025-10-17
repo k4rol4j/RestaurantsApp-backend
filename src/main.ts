@@ -18,6 +18,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
   app.use(cookieParser());
 
   const publicPath = join(__dirname, '..', 'public');
@@ -44,4 +45,5 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 9000, '0.0.0.0');
 }
+
 bootstrap();
