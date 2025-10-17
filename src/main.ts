@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { existsSync } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -20,15 +21,27 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  // 🔥 To jest najważniejsze — musi być PRZED listen()
-  app.useStaticAssets(join(__dirname, '..', 'public'), {
-    prefix: '/', // dzięki temu /images/... działa
+  // 📁 Ścieżka do folderu public (w dist/public po buildzie)
+  const publicPath = join(__dirname, '..', 'public');
+  console.log(
+    '📁 Serving static assets from:',
+    publicPath,
+    '| exists:',
+    existsSync(publicPath),
+  );
+
+  // 🔥 Serwowanie folderu public, np. /images/logo_restaurants/ciao.png
+  app.useStaticAssets(publicPath, {
+    prefix: '/', // <- NIE /api !
   });
 
   const express = app.getHttpAdapter().getInstance();
   express.set('trust proxy', 1);
 
-  const whitelist = ['https://restaurantsapp-frontend.onrender.com'];
+  const whitelist = [
+    'https://restaurantsapp-frontend.onrender.com',
+    'http://localhost:5173', // dla testów lokalnych
+  ];
   const FALLBACK_ORIGIN = whitelist[0];
 
   app.enableCors({
