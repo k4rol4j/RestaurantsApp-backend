@@ -12,6 +12,7 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
 import { TablesModule } from './modules/tables/tables/tables.module';
 import { OwnerPanelModule } from './modules/owner-panel/owner-panel.module';
 import { AdminModule } from './admin/admin.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AdminModule } from './admin/admin.module';
     TablesModule,
     OwnerPanelModule,
     AdminModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],
