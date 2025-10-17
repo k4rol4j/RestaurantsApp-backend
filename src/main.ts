@@ -18,29 +18,15 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-
   app.use(cookieParser());
 
-  // 📁 Ścieżka do folderu public (w dist/public po buildzie)
   const publicPath = join(__dirname, '..', 'public');
-  console.log(
-    '📁 Serving static assets from:',
-    publicPath,
-    '| exists:',
-    existsSync(publicPath),
-  );
-
-  // 🔥 Serwowanie folderu public, np. /images/logo_restaurants/ciao.png
-  app.useStaticAssets(publicPath, {
-    prefix: '/', // <- NIE /api !
-  });
-
-  const express = app.getHttpAdapter().getInstance();
-  express.set('trust proxy', 1);
+  console.log('Static from:', publicPath, 'exists:', existsSync(publicPath));
+  app.useStaticAssets(publicPath, { prefix: '/' });
 
   const whitelist = [
     'https://restaurantsapp-frontend.onrender.com',
-    'http://localhost:5173', // dla testów lokalnych
+    'http://localhost:5173',
   ];
   const FALLBACK_ORIGIN = whitelist[0];
 
@@ -58,5 +44,4 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 9000, '0.0.0.0');
 }
-
 bootstrap();

@@ -20,11 +20,19 @@ export class UploadController {
           cb(null, unique + extname(file.originalname));
         },
       }),
+      limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+      fileFilter: (req, file, cb) => {
+        if (/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype))
+          cb(null, true);
+        else cb(new Error('INVALID_FILE_TYPE') as any, false);
+      },
     }),
   )
-  uploadFile(@UploadedFile() file: any) {
-    return {
-      url: `/images/logo_restaurants/${file.filename}`,
-    };
+  upload(@UploadedFile() file: any) {
+    if (!file) {
+      return { error: 'No file' };
+    }
+    // ZWRACAMY WZGLĘDNĄ ŚCIEŻKĘ — to jest to, co trafia do bazy:
+    return { url: `/images/logo_restaurants/${file.filename}` };
   }
 }
