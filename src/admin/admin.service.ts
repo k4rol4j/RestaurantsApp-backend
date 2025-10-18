@@ -222,32 +222,26 @@ export class AdminService {
     take?: number;
   }) {
     const { restaurantId, userId } = params;
-    const skip = params.skip ?? 0;
-    const take = params.take ?? 100;
 
-    const where: any = {};
+    const where: Prisma.ReviewWhereInput = {};
     if (restaurantId) where.restaurantId = restaurantId;
     if (userId) where.userId = userId;
 
-    const [items, total] = await Promise.all([
-      this.prisma.review.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { date: 'desc' },
-        select: {
-          id: true,
-          rating: true,
-          comment: true,
-          date: true,
-          reservationId: true,
-          user: { select: { id: true, email: true } },
-          restaurant: { select: { id: true, name: true } },
-        },
-      }),
-      this.prisma.review.count({ where }),
-    ]);
-    return [items, total] as const;
+    const items = await this.prisma.review.findMany({
+      where,
+      orderBy: { date: 'desc' },
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        date: true,
+        reservationId: true,
+        user: { select: { id: true, email: true } },
+        restaurant: { select: { id: true, name: true } },
+      },
+    });
+
+    return [items, items.length] as const;
   }
 
   async deleteReview(id: number) {
