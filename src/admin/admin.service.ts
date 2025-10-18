@@ -59,7 +59,7 @@ export class AdminService {
   }
 
   // -------------- RESTAURANTS --------------
-  async listRestaurants(q = '', skip = 0, take = 20) {
+  async listRestaurants(q = '', skip = 0, take = 100) {
     const where = q
       ? { name: { contains: q, mode: 'insensitive' as const } }
       : {};
