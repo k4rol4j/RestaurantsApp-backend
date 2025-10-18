@@ -263,4 +263,20 @@ export class AdminService {
       data: { status: 'CANCELLED' },
     });
   }
+
+  async restoreReservation(id: number) {
+    const r = await this.prisma.reservation.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Reservation not found');
+
+    if (r.status !== 'CANCELLED') {
+      throw new BadRequestException(
+        'Only cancelled reservations can be restored',
+      );
+    }
+
+    return this.prisma.reservation.update({
+      where: { id },
+      data: { status: 'CONFIRMED' },
+    });
+  }
 }

@@ -53,4 +53,9 @@ export class AdminReservationsController {
     await this.admin.cancelReservation(id);
     return { ok: true };
   }
+
+  @Patch(':id/restore')
+  async restoreReservation(@Param('id', ParseIntPipe) id: number) {
+    return this.admin.restoreReservation(id);
+  }
 }
