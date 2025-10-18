@@ -63,24 +63,47 @@ export class AdminService {
     const where = q
       ? { name: { contains: q, mode: 'insensitive' as const } }
       : {};
-    const [items, total] = await Promise.all([
+
+    // pobieramy wszystkie restauracje
+    const [restaurants, total] = await Promise.all([
       this.prisma.restaurant.findMany({
         where,
         skip,
         take,
-        orderBy: { id: 'desc' },
+        orderBy: { id: 'asc' },
         select: {
           id: true,
           name: true,
           location: true,
           cuisine: true,
-          rating: true,
           ownerId: true,
           owner: { select: { id: true, email: true } },
+          reviews: { select: { rating: true } }, // ⬅️ dodaj recenzje
         },
       }),
       this.prisma.restaurant.count({ where }),
     ]);
+
+    // policz średnią ocen z recenzji
+    const items = restaurants.map((r) => {
+      const ratings = r.reviews.map((rev) => rev.rating);
+      const avg =
+        ratings.length > 0
+          ? Number(
+              (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1),
+            )
+          : 0;
+      return {
+        id: r.id,
+        name: r.name,
+        location: r.location,
+        cuisine: r.cuisine,
+        ownerId: r.ownerId,
+        owner: r.owner,
+        rating: avg, // ⬅️ nadpisz rating średnią
+      };
+    });
+
     return [items, total] as const;
   }
 
