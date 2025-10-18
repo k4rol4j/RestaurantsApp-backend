@@ -181,7 +181,7 @@ export class AdminService {
         where,
         skip,
         take,
-        orderBy: { date: 'desc' },
+        orderBy: { id: 'desc' },
         select: {
           id: true,
           date: true,
@@ -223,7 +223,7 @@ export class AdminService {
   }) {
     const { restaurantId, userId } = params;
     const skip = params.skip ?? 0;
-    const take = params.take ?? 20;
+    const take = params.take ?? 100;
 
     const where: any = {};
     if (restaurantId) where.restaurantId = restaurantId;
@@ -252,5 +252,15 @@ export class AdminService {
 
   async deleteReview(id: number) {
     return this.prisma.review.delete({ where: { id } });
+  }
+
+  async cancelReservation(id: number) {
+    const r = await this.prisma.reservation.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Reservation not found');
+
+    return this.prisma.reservation.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
   }
 }
