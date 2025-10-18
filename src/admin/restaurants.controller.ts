@@ -25,7 +25,7 @@ export class AdminRestaurantsController {
   async list(
     @Query('q') q = '',
     @Query('skip') skip = '0',
-    @Query('take') take = '20',
+    @Query('take') take = '100',
   ) {
     const [items, total] = await this.admin.listRestaurants(
       q,
