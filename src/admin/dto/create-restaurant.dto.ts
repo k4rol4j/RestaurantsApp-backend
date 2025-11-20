@@ -1,12 +1,43 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateRestaurantDto {
-  @IsString() name: string;
-  @IsString() location: string;
-  @IsString() cuisine: string;
-  @IsInt() ownerId: number;
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 
-  @IsOptional() @IsInt() @Min(0) capacity?: number;
-  @IsOptional() @IsInt() @Min(0) rating?: number;
-  @IsOptional() @IsString() description?: string;
+  @IsNumber()
+  ownerId: number;
+
+  // 🔹 nowe pola adresu
+  @IsString()
+  @IsNotEmpty()
+  city: string;
+
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  @IsNumber()
+  latitude: number;
+
+  @IsNumber()
+  longitude: number;
+
+  // 🔹 kuchnia (jako nazwa kategorii)
+  @IsString()
+  @IsNotEmpty()
+  cuisine: string;
+
+  // 🔹 opcjonalne
+  @IsOptional()
+  @IsNumber()
+  capacity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  rating?: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 }
