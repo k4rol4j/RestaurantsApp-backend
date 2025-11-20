@@ -81,21 +81,19 @@ export class RestaurantsController {
   @Get('cities')
   async getCities() {
     const all = await this.restaurantService.restaurantsList();
-    const citiesMap = new Map<string, any>();
+    const citiesMap = new Map();
 
-    for (const r of all as any[]) {
-      const addr = r.address;
-      if (!addr || addr.latitude == null || addr.longitude == null) continue;
+    for (const r of all) {
+      if (!r.address || !r.address.city) continue;
 
-      const cityLabel = addr.city ?? 'Nieznane';
-      const cityKey = cityLabel.toLowerCase();
+      const cityKey = r.address.city.toLowerCase();
 
       if (!citiesMap.has(cityKey)) {
         citiesMap.set(cityKey, {
-          label: cityLabel,
+          label: r.address.city,
           value: cityKey,
-          latitude: addr.latitude,
-          longitude: addr.longitude,
+          latitude: r.address.latitude,
+          longitude: r.address.longitude,
         });
       }
     }
