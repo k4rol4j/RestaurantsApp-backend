@@ -10,23 +10,18 @@ export class RestaurantsService {
 
   async findAvailableTables(params: {
     restaurantId: number;
-    start: Date; // start rezerwacji
-    end: Date; // koniec rezerwacji
+    start: Date;
+    end: Date;
     people: number;
   }) {
     const { restaurantId, start, end, people } = params;
 
-    // 1) Znajdź stoliki zajęte przez rezerwacje, które NAKŁADAJĄ się na [start, end)
-    // Uwaga: używamy Twoich pól: reservation.date (start) i reservation.endAt (koniec)
     const overlapping = await this.prisma.reservationTable.findMany({
       where: {
         reservation: {
           restaurantId,
           status: { in: ['PENDING', 'CONFIRMED'] },
-          AND: [
-            { date: { lt: end } }, // rez.start < end
-            { endAt: { gt: start } }, // rez.end   > start
-          ],
+          AND: [{ date: { lt: end } }, { endAt: { gt: start } }],
         },
       },
       select: { tableId: true },
@@ -34,8 +29,6 @@ export class RestaurantsService {
 
     const busyIds = Array.from(new Set(overlapping.map((r) => r.tableId)));
 
-    // 2) Zwróć wolne stoliki o DOKŁADNIE tej liczbie miejsc (seats === people)
-    //    (Jeśli chcesz dopuścić większe, zmień na: seats: { gte: people })
     return this.prisma.table.findMany({
       where: {
         restaurantId,
@@ -57,17 +50,46 @@ export class RestaurantsService {
       longitude,
       radius,
       sortByDistance,
-      date, // "YYYY-MM-DD"
-      time, // "HH:mm"
-      partySize, // liczba osób
+      date,
+      time,
+      partySize,
+      name,
+      location,
     } = filterDto;
 
     const andConditions: Prisma.RestaurantWhereInput[] = [];
 
-    // Kuchnie
+    // Nazwa
+    if (name) {
+      andConditions.push({
+        name: { contains: name, mode: 'insensitive' },
+      });
+    }
+
+    // Lokalizacja – teraz po Address (city / district)
+    if (location) {
+      andConditions.push({
+        OR: [
+          { address: { city: { contains: location, mode: 'insensitive' } } },
+          {
+            address: {
+              district: { contains: location, mode: 'insensitive' },
+            },
+          },
+        ],
+      });
+    }
+
+    // Kuchnie – po relacji RestaurantCuisine -> Cuisine.name
     if (cuisine?.length) {
       andConditions.push({
-        OR: cuisine.map((c) => ({ cuisine: { contains: c } })),
+        cuisines: {
+          some: {
+            cuisine: {
+              name: { in: cuisine },
+            },
+          },
+        },
       });
     }
 
@@ -76,7 +98,7 @@ export class RestaurantsService {
       andConditions.push({ rating: { gte: minRating } });
     }
 
-    // Geofiltrowanie
+    // Geofiltrowanie po Address.latitude / longitude
     if (
       latitude !== undefined &&
       longitude !== undefined &&
@@ -85,8 +107,10 @@ export class RestaurantsService {
       const latDelta = radius / 111;
       const lonDelta = radius / (111 * Math.cos(latitude * (Math.PI / 180)));
       andConditions.push({
-        latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
-        longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
+        address: {
+          latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
+          longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
+        },
       });
     }
 
@@ -97,25 +121,38 @@ export class RestaurantsService {
     const orderBy: Prisma.RestaurantOrderByWithRelationInput | undefined =
       sortOrder ? { rating: sortOrder } : undefined;
 
-    // 1) Pobierz kandydatów
-    let restaurants = await this.prisma.restaurant.findMany({ where, orderBy });
+    // 1) Pobierz kandydatów razem z adresem i kuchniami
+    let restaurants = await this.prisma.restaurant.findMany({
+      where,
+      orderBy,
+      include: {
+        address: true,
+        cuisines: { include: { cuisine: true } },
+      },
+    });
 
-    // 2) Sortowanie po dystansie (opcjonalnie)
+    // 2) Sortowanie po dystansie (używa address.latitude/longitude)
     if (sortByDistance && latitude !== undefined && longitude !== undefined) {
       restaurants = restaurants
-        .filter((r) => r.latitude !== null && r.longitude !== null)
+        .filter(
+          (r) =>
+            r.address &&
+            r.address.latitude !== null &&
+            r.address.longitude !== null,
+        )
         .map((r) => ({
           ...r,
           distance: this.calculateDistance(
             latitude,
             longitude,
-            r.latitude!,
-            r.longitude!,
+            r.address!.latitude,
+            r.address!.longitude,
           ),
         }))
         .sort((a, b) => a.distance - b.distance);
     }
 
+    // 3) Filtr po dostępności (data + godzina + partySize)
     if (date && time && partySize) {
       const SLOT_DURATION = 120;
 
@@ -134,7 +171,7 @@ export class RestaurantsService {
       const withinOpeningHours = (openingHours?: string | null) => {
         if (!openingHours) return true;
         const m = openingHours.match(/\b(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\b/);
-        if (!m) return true; // nie parsuje? nie blokuj
+        if (!m) return true;
         const openMin = toMin(m[1]);
         const closeMin = toMin(m[2]);
         return slotStartMin >= openMin && slotStartMin < closeMin;
@@ -152,7 +189,7 @@ export class RestaurantsService {
             where: { restaurantId: r.id },
             _sum: { seats: true },
           });
-          capacity = sum._sum.seats ?? 0; // konserwatywnie: 0, czyli brak wolnych
+          capacity = sum._sum.seats ?? 0;
         }
 
         // 2) Rezerwacje z TEGO dnia
@@ -164,7 +201,6 @@ export class RestaurantsService {
           select: { time: true, people: true, durationMinutes: true },
         });
 
-        // 3) Zajętość w slocie (minuty dnia, bez endAt)
         let used = 0;
         for (const res of dayReservations) {
           const resStartMin = toMin(res.time);
@@ -204,21 +240,32 @@ export class RestaurantsService {
     return R * c;
   }
 
+  // 🔹 Teraz z tabeli Cuisine, a nie z Restaurant.cuisine
   async getAvailableCuisines(): Promise<string[]> {
-    const cuisines = await this.prisma.restaurant.findMany({
-      select: { cuisine: true },
-      distinct: ['cuisine'],
+    const cuisines = await this.prisma.cuisine.findMany({
+      select: { name: true },
+      orderBy: { name: 'asc' },
     });
-    return cuisines.map((r) => r.cuisine);
+    return cuisines.map((c) => c.name);
   }
 
+  // 🔹 Lista restauracji od razu z adresem i kuchniami
   async restaurantsList() {
-    return this.prisma.restaurant.findMany();
+    return this.prisma.restaurant.findMany({
+      include: {
+        address: true,
+        cuisines: { include: { cuisine: true } },
+      },
+    });
   }
 
   async getRestaurantById(id: number) {
     const restaurant = await this.prisma.restaurant.findUnique({
       where: { id },
+      include: {
+        address: true,
+        cuisines: { include: { cuisine: true } },
+      },
     });
     if (!restaurant) throw new Error('Restaurant not found');
     return restaurant;
@@ -236,7 +283,6 @@ export class RestaurantsService {
     const location = pickString(searchDto?.location);
     const cuisine = pickString(searchDto?.cuisine);
 
-    // Liczby mogą przyjść jako stringi
     const toNum = (v: unknown) =>
       v === undefined || v === null || v === '' ? undefined : Number(v);
 
@@ -250,7 +296,7 @@ export class RestaurantsService {
       and.push({ name: { contains: name, mode: 'insensitive' } });
     }
 
-    // Lokalizacja tylko, gdy NIE ma geofiltra
+    // Lokalizacja po Address
     if (
       location &&
       !(
@@ -259,11 +305,28 @@ export class RestaurantsService {
         typeof radius === 'number'
       )
     ) {
-      and.push({ location: { contains: location, mode: 'insensitive' } });
+      and.push({
+        OR: [
+          { address: { city: { contains: location, mode: 'insensitive' } } },
+          {
+            address: {
+              district: { contains: location, mode: 'insensitive' },
+            },
+          },
+        ],
+      });
     }
 
     if (cuisine) {
-      and.push({ cuisine: { contains: cuisine, mode: 'insensitive' } });
+      and.push({
+        cuisines: {
+          some: {
+            cuisine: {
+              name: { contains: cuisine, mode: 'insensitive' },
+            },
+          },
+        },
+      });
     }
 
     if (
@@ -274,15 +337,23 @@ export class RestaurantsService {
       const latDelta = radius / 111;
       const lonDelta = radius / (111 * Math.cos(latitude * (Math.PI / 180)));
       and.push({
-        latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
-        longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
+        address: {
+          latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
+          longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
+        },
       });
     }
 
     const where: Prisma.RestaurantWhereInput = and.length ? { AND: and } : {};
     console.log('[SEARCH] where =', JSON.stringify(where));
 
-    return this.prisma.restaurant.findMany({ where });
+    return this.prisma.restaurant.findMany({
+      where,
+      include: {
+        address: true,
+        cuisines: { include: { cuisine: true } },
+      },
+    });
   }
 
   async reviewRestaurants(restaurantId: number) {
@@ -350,8 +421,14 @@ export class RestaurantsService {
 
     return this.prisma.restaurant.findMany({
       where: {
-        latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
-        longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
+        address: {
+          latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
+          longitude: { gte: longitude - lonDelta, lte: longitude + lonDelta },
+        },
+      },
+      include: {
+        address: true,
+        cuisines: { include: { cuisine: true } },
       },
     });
   }

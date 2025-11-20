@@ -36,14 +36,10 @@ model Table {
 model Restaurant {
   id           Int           @id @default(autoincrement())
   name         String
-  location     String
-  cuisine      String
   rating       Float
   reservations Reservation[]
   reviews      Review[]
   favorites    Favorite[]
-  latitude     Float?
-  longitude    Float?
   imageUrl     String?
   description  String?
   imageGallery String?
@@ -53,6 +49,9 @@ model Restaurant {
   ownerId      Int
   owner        User          @relation("OwnerRestaurants", fields: [ownerId], references: [id])
   menu         Json?
+  addressId Int? @unique
+  address      Address?      @relation(fields: [addressId], references: [id])
+  cuisines     RestaurantCuisine[]
 }
 
 model Review {
@@ -119,3 +118,33 @@ model ReservationTable {
 
   @@id([reservationId, tableId])
 }
+
+model RestaurantCuisine {
+  restaurantId Int
+  cuisineId    Int
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  cuisine      Cuisine    @relation(fields: [cuisineId], references: [id])
+
+  @@id([restaurantId, cuisineId])
+}
+
+
+model Address {
+  id           Int    @id @default(autoincrement())
+  city         String
+  district     String?
+  street       String?
+  streetNumber String?
+  latitude     Float
+  longitude    Float
+
+  restaurant   Restaurant?
+}
+
+model Cuisine {
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  restaurants RestaurantCuisine[]
+}
+

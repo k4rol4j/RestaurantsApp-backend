@@ -53,11 +53,10 @@ export class RestaurantsController {
     return this.restaurantService.canUserReviewRestaurant(userId, restaurantId);
   }
 
+  // 🔹 Teraz korzysta z tabeli Cuisine
   @Get('cuisines')
   async getCuisines() {
-    const all = await this.restaurantService.restaurantsList();
-    const cuisines = [...new Set(all.map((r) => r.cuisine))];
-    return cuisines;
+    return this.restaurantService.getAvailableCuisines();
   }
 
   @Post('reviews')
@@ -82,18 +81,21 @@ export class RestaurantsController {
   @Get('cities')
   async getCities() {
     const all = await this.restaurantService.restaurantsList();
-    const citiesMap = new Map();
+    const citiesMap = new Map<string, any>();
 
-    for (const r of all) {
-      if (!r.location || !r.latitude || !r.longitude) continue;
+    for (const r of all as any[]) {
+      const addr = r.address;
+      if (!addr || addr.latitude == null || addr.longitude == null) continue;
 
-      const cityKey = r.location.toLowerCase();
+      const cityLabel = addr.city ?? 'Nieznane';
+      const cityKey = cityLabel.toLowerCase();
+
       if (!citiesMap.has(cityKey)) {
         citiesMap.set(cityKey, {
-          label: r.location,
+          label: cityLabel,
           value: cityKey,
-          latitude: r.latitude,
-          longitude: r.longitude,
+          latitude: addr.latitude,
+          longitude: addr.longitude,
         });
       }
     }
@@ -118,7 +120,6 @@ export class RestaurantsController {
     return this.restaurantService.getRestaurantById(id);
   }
 
-  // GET /restaurants/:id/available-tables?start=2025-09-12T19:00:00Z&end=2025-09-12T20:30:00Z&people=2
   @Get(':id/available-tables')
   async availableTables(
     @Param('id', ParseIntPipe) id: number,
