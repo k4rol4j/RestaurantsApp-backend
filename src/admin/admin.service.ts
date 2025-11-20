@@ -64,7 +64,6 @@ export class AdminService {
       ? { name: { contains: q, mode: 'insensitive' as const } }
       : {};
 
-    // pobieramy wszystkie restauracje
     const [restaurants, total] = await Promise.all([
       this.prisma.restaurant.findMany({
         where,
@@ -74,17 +73,16 @@ export class AdminService {
         select: {
           id: true,
           name: true,
-          location: true,
-          cuisine: true,
           ownerId: true,
           owner: { select: { id: true, email: true } },
-          reviews: { select: { rating: true } }, // ⬅️ dodaj recenzje
+          address: true,
+          cuisines: { include: { cuisine: true } },
+          reviews: { select: { rating: true } },
         },
       }),
       this.prisma.restaurant.count({ where }),
     ]);
 
-    // policz średnią ocen z recenzji
     const items = restaurants.map((r) => {
       const ratings = r.reviews.map((rev) => rev.rating);
       const avg =
@@ -93,14 +91,15 @@ export class AdminService {
               (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1),
             )
           : 0;
+
       return {
         id: r.id,
         name: r.name,
-        location: r.location,
-        cuisine: r.cuisine,
         ownerId: r.ownerId,
         owner: r.owner,
-        rating: avg, // ⬅️ nadpisz rating średnią
+        rating: avg,
+        address: r.address,
+        cuisines: r.cuisines.map((c) => c.cuisine.name),
       };
     });
 
@@ -109,23 +108,23 @@ export class AdminService {
 
   async createRestaurant(dto: {
     name: string;
-    location: string;
+    city: string;
+    district?: string;
+    latitude: number;
+    longitude: number;
     cuisine: string;
     ownerId: number;
     capacity?: number;
     rating?: number;
     description?: string;
   }) {
-    // 1) Owner MUSI istnieć
     const owner = await this.prisma.user.findUnique({
       where: { id: dto.ownerId },
       select: { roles: true },
     });
-    if (!owner) {
-      throw new NotFoundException('Właściciel (ownerId) nie istnieje');
-    }
 
-    // 2) (opcjonalnie) dopisz rolę OWNER, jeśli jej nie ma
+    if (!owner) throw new NotFoundException('Właściciel nie istnieje');
+
     if (!owner.roles.includes('RESTAURANT_OWNER')) {
       await this.prisma.user.update({
         where: { id: dto.ownerId },
@@ -137,41 +136,42 @@ export class AdminService {
       });
     }
 
-    // 3) Tworzenie + czytelne błędy
-    try {
-      return await this.prisma.restaurant.create({
+    return this.prisma.$transaction(async (tx) => {
+      const address = await tx.address.create({
+        data: {
+          city: dto.city,
+          district: dto.district ?? null,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+        },
+      });
+
+      const restaurant = await tx.restaurant.create({
         data: {
           name: dto.name.trim(),
-          location: dto.location.trim(),
-          cuisine: dto.cuisine.trim(),
           ownerId: dto.ownerId,
           capacity: dto.capacity ?? 50,
           rating: dto.rating ?? 0,
           description: dto.description ?? null,
-        },
-        select: {
-          id: true,
-          name: true,
-          location: true,
-          cuisine: true,
-          rating: true,
-          ownerId: true,
-          owner: { select: { id: true, email: true } },
+          addressId: address.id,
         },
       });
-    } catch (e) {
-      if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === 'P2002'
-      ) {
-        const target = Array.isArray((e.meta as any)?.target)
-          ? (e.meta as any).target.join(', ')
-          : String((e.meta as any)?.target ?? '');
-        throw new BadRequestException(
-          `Konflikt unikalności dla: ${target || 'nieznane pole'}`,
-        );
+
+      // przypięcie kuchni do restauracji
+      const cuisine = await tx.cuisine.findFirst({
+        where: { name: dto.cuisine },
+      });
+      if (cuisine) {
+        await tx.restaurantCuisine.create({
+          data: {
+            restaurantId: restaurant.id,
+            cuisineId: cuisine.id,
+          },
+        });
       }
-    }
+
+      return restaurant;
+    });
   }
 
   async deleteRestaurant(id: number) {

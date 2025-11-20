@@ -102,11 +102,9 @@ export class OwnerPanelService {
         openingHours: true,
         imageGallery: true,
         capacity: true,
-        latitude: true,
-        longitude: true,
-        location: true,
-        cuisine: true,
         menu: true,
+        address: true,
+        cuisines: { include: { cuisine: true } },
       },
     });
   }
@@ -114,7 +112,14 @@ export class OwnerPanelService {
   updateProfile(restaurantId: number, dto: any) {
     return this.prisma.restaurant.update({
       where: { id: restaurantId },
-      data: dto,
+      data: {
+        name: dto.name,
+        description: dto.description,
+        openingHours: dto.openingHours,
+        imageGallery: dto.imageGallery,
+        capacity: dto.capacity,
+        menu: dto.menu,
+      },
     });
   }
 
