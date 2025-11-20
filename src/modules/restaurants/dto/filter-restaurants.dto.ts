@@ -13,15 +13,15 @@ import { Type } from 'class-transformer';
 export class FilterRestaurantsDto {
   @IsOptional()
   @IsString()
-  name?: string; // Opcjonalna nazwa restauracji
+  name?: string;
 
   @IsOptional()
   @IsString()
-  location?: string; // Opcjonalna lokalizacja restauracji
+  location?: string;
 
   @IsOptional()
   @IsString({ each: true })
-  cuisine?: string[]; // Opcjonalny typ kuchni
+  cuisine?: string[];
 
   @IsOptional()
   @IsNumber()
