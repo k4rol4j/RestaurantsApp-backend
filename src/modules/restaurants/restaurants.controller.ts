@@ -118,6 +118,11 @@ export class RestaurantsController {
     return this.restaurantService.getRestaurantById(id);
   }
 
+  @Get('districts/:city')
+  async getDistricts(@Param('city') city: string) {
+    return this.restaurantService.getDistricts(city);
+  }
+
   @Get(':id/available-tables')
   async availableTables(
     @Param('id', ParseIntPipe) id: number,

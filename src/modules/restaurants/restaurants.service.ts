@@ -470,4 +470,17 @@ export class RestaurantsService {
       select: { id: true, name: true },
     });
   }
+
+  async getDistricts(city: string) {
+    const districts = await this.prisma.address.findMany({
+      where: { city: { equals: city, mode: 'insensitive' } },
+      select: { district: true },
+    });
+
+    const unique = Array.from(
+      new Set(districts.map((d) => d.district).filter(Boolean)),
+    );
+
+    return unique.sort();
+  }
 }
