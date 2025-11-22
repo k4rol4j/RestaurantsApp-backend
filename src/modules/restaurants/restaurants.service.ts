@@ -4,6 +4,19 @@ import { Prisma } from '@prisma/client';
 import { FilterRestaurantsDto } from './dto/filter-restaurants.dto';
 import { ReviewRestaurantDto } from './dto/review-restaurant.dto';
 
+type RestaurantBase = Prisma.RestaurantGetPayload<{
+  include: {
+    address: true;
+    cuisines: { include: { cuisine: true } };
+    reviews: true;
+  };
+}>;
+
+type RestaurantComputed = RestaurantBase & {
+  avgRating: number | null;
+  distance?: number;
+};
+
 @Injectable()
 export class RestaurantsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -59,53 +72,45 @@ export class RestaurantsService {
 
     const andConditions: Prisma.RestaurantWhereInput[] = [];
 
-    // Nazwa
+    // 🔍 Nazwa
     if (name) {
       andConditions.push({
         name: { contains: name, mode: 'insensitive' },
       });
     }
 
-    // Lokalizacja – teraz po Address (city / district)
+    // 📍 Lokalizacja (city/district)
     if (location) {
       andConditions.push({
         OR: [
           { address: { city: { contains: location, mode: 'insensitive' } } },
           {
-            address: {
-              district: { contains: location, mode: 'insensitive' },
-            },
+            address: { district: { contains: location, mode: 'insensitive' } },
           },
         ],
       });
     }
 
-    // Kuchnie – po relacji RestaurantCuisine -> Cuisine.name
+    // 🍽 Kuchnie
     if (cuisine?.length) {
       andConditions.push({
         cuisines: {
           some: {
-            cuisine: {
-              name: { in: cuisine },
-            },
+            cuisine: { name: { in: cuisine } },
           },
         },
       });
     }
 
-    // Minimalna ocena
-    if (minRating !== undefined) {
-      andConditions.push({ rating: { gte: minRating } });
-    }
-
-    // Geofiltrowanie po Address.latitude / longitude
+    // 🌍 Geolokalizacja
     if (
       latitude !== undefined &&
       longitude !== undefined &&
       radius !== undefined
     ) {
       const latDelta = radius / 111;
-      const lonDelta = radius / (111 * Math.cos(latitude * (Math.PI / 180)));
+      const lonDelta = radius / (111 * Math.cos((latitude * Math.PI) / 180));
+
       andConditions.push({
         address: {
           latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
@@ -114,75 +119,91 @@ export class RestaurantsService {
       });
     }
 
-    const where: Prisma.RestaurantWhereInput = andConditions.length
-      ? { AND: andConditions }
-      : {};
+    const where: Prisma.RestaurantWhereInput =
+      andConditions.length > 0 ? { AND: andConditions } : {};
 
-    const orderBy: Prisma.RestaurantOrderByWithRelationInput | undefined =
-      sortOrder ? { rating: sortOrder } : undefined;
-
-    // 1) Pobierz kandydatów razem z adresem i kuchniami
-    let restaurants = await this.prisma.restaurant.findMany({
+    // ⭐ POBRANIE SUROWYCH DANYCH (bez avgRating)
+    const base: RestaurantBase[] = await this.prisma.restaurant.findMany({
       where,
-      orderBy,
       include: {
         address: true,
         cuisines: { include: { cuisine: true } },
+        reviews: true,
       },
     });
 
-    // 2) Sortowanie po dystansie (używa address.latitude/longitude)
+    // ⭐ DODANIE avgRating
+    let restaurants: RestaurantComputed[] = base.map((r) => {
+      const avg =
+        r.reviews.length > 0
+          ? r.reviews.reduce((s, rev) => s + rev.rating, 0) / r.reviews.length
+          : null;
+
+      return { ...r, avgRating: avg };
+    });
+
+    // ⭐ Filtr minRating
+    if (minRating !== undefined) {
+      restaurants = restaurants.filter(
+        (r) => r.avgRating !== null && r.avgRating >= minRating,
+      );
+    }
+
+    // ⭐ Sortowanie po średniej
+    if (sortOrder === 'asc') {
+      restaurants = restaurants.sort(
+        (a, b) => (a.avgRating ?? 0) - (b.avgRating ?? 0),
+      );
+    } else if (sortOrder === 'desc') {
+      restaurants = restaurants.sort(
+        (a, b) => (b.avgRating ?? 0) - (a.avgRating ?? 0),
+      );
+    }
+
+    // ⭐ Sortowanie po dystansie
     if (sortByDistance && latitude !== undefined && longitude !== undefined) {
       restaurants = restaurants
-        .filter(
-          (r) =>
-            r.address &&
-            r.address.latitude !== null &&
-            r.address.longitude !== null,
-        )
         .map((r) => ({
           ...r,
           distance: this.calculateDistance(
             latitude,
             longitude,
-            r.address!.latitude,
-            r.address!.longitude,
+            r.address?.latitude ?? 0,
+            r.address?.longitude ?? 0,
           ),
         }))
-        .sort((a, b) => a.distance - b.distance);
+        .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
     }
 
-    // 3) Filtr po dostępności (data + godzina + partySize)
+    // 🕒 Filtr dostępności (BEZ ZMIAN)
     if (date && time && partySize) {
       const SLOT_DURATION = 120;
-
       const dayStart = new Date(`${date}T00:00:00`);
       const nextDayStart = new Date(dayStart);
       nextDayStart.setDate(nextDayStart.getDate() + 1);
 
       const toMin = (hhmm: string) => {
-        const [h, m] = (hhmm ?? '00:00').slice(0, 5).split(':').map(Number);
-        return (h || 0) * 60 + (m || 0);
+        const [h, m] = hhmm.split(':').map(Number);
+        return h * 60 + m;
       };
 
-      const slotStartMin = toMin(time);
-      const slotEndMin = slotStartMin + SLOT_DURATION;
+      const slotStart = toMin(time);
+      const slotEnd = slotStart + SLOT_DURATION;
 
-      const withinOpeningHours = (openingHours?: string | null) => {
-        if (!openingHours) return true;
-        const m = openingHours.match(/\b(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\b/);
-        if (!m) return true;
-        const openMin = toMin(m[1]);
-        const closeMin = toMin(m[2]);
-        return slotStartMin >= openMin && slotStartMin < closeMin;
-      };
-
-      const available: typeof restaurants = [];
+      const available: RestaurantComputed[] = [];
 
       for (const r of restaurants) {
-        if (!withinOpeningHours((r as any).openingHours)) continue;
+        const within = (opening?: string | null) => {
+          if (!opening) return true;
+          const m = opening.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
+          if (!m) return true;
+          const open = toMin(m[1]);
+          const close = toMin(m[2]);
+          return slotStart >= open && slotStart < close;
+        };
 
-        // 1) Efektywna pojemność
+        if (!within(r.openingHours)) continue;
+
         let capacity = r.capacity ?? null;
         if (capacity == null) {
           const sum = await this.prisma.table.aggregate({
@@ -192,8 +213,7 @@ export class RestaurantsService {
           capacity = sum._sum.seats ?? 0;
         }
 
-        // 2) Rezerwacje z TEGO dnia
-        const dayReservations = await this.prisma.reservation.findMany({
+        const reservations = await this.prisma.reservation.findMany({
           where: {
             restaurantId: r.id,
             date: { gte: dayStart, lt: nextDayStart },
@@ -201,17 +221,14 @@ export class RestaurantsService {
           select: { time: true, people: true, durationMinutes: true },
         });
 
-        let used = 0;
-        for (const res of dayReservations) {
-          const resStartMin = toMin(res.time);
-          const resEndMin =
-            resStartMin + (res.durationMinutes ?? SLOT_DURATION);
-          const overlaps = resStartMin < slotEndMin && resEndMin > slotStartMin;
-          if (overlaps) used += res.people ?? 0;
+        let occupied = 0;
+        for (const res of reservations) {
+          const start = toMin(res.time);
+          const end = start + (res.durationMinutes ?? SLOT_DURATION);
+          if (start < slotEnd && end > slotStart) occupied += res.people;
         }
 
-        const free = capacity - used;
-        if (free >= partySize) available.push(r);
+        if (capacity - occupied >= partySize) available.push(r);
       }
 
       restaurants = available;
