@@ -326,9 +326,7 @@ export class RestaurantsService {
         OR: [
           { address: { city: { contains: location, mode: 'insensitive' } } },
           {
-            address: {
-              district: { contains: location, mode: 'insensitive' },
-            },
+            address: { district: { contains: location, mode: 'insensitive' } },
           },
         ],
       });
@@ -353,6 +351,7 @@ export class RestaurantsService {
     ) {
       const latDelta = radius / 111;
       const lonDelta = radius / (111 * Math.cos(latitude * (Math.PI / 180)));
+
       and.push({
         address: {
           latitude: { gte: latitude - latDelta, lte: latitude + latDelta },
@@ -364,13 +363,28 @@ export class RestaurantsService {
     const where: Prisma.RestaurantWhereInput = and.length ? { AND: and } : {};
     console.log('[SEARCH] where =', JSON.stringify(where));
 
-    return this.prisma.restaurant.findMany({
+    // ⭐ POBIERAMY z recenzjami, żeby liczyć średnią
+    const raw = await this.prisma.restaurant.findMany({
       where,
       include: {
         address: true,
         cuisines: { include: { cuisine: true } },
+        reviews: true,
       },
     });
+
+    // ⭐ LICZENIE ŚREDNIEJ — TERAZ SEARCH TEŻ JĄ MA!
+    const withAvg = raw.map((r) => {
+      const avg =
+        r.reviews.length > 0
+          ? r.reviews.reduce((sum, rev) => sum + rev.rating, 0) /
+            r.reviews.length
+          : null;
+
+      return { ...r, avgRating: avg };
+    });
+
+    return withAvg;
   }
 
   async reviewRestaurants(restaurantId: number) {
