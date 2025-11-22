@@ -28,22 +28,22 @@ export class FilterRestaurantsDto {
   @Min(1)
   @Max(5)
   @Type(() => Number)
-  minRating?: number; // Minimalna ocena (1 - 5)
+  minRating?: number;
 
   @IsOptional()
   @IsDateString()
-  date?: string; // "YYYY-MM-DD"
+  date?: string;
 
   @IsOptional()
   @Matches(/^([0-1][0-9]|2[0-3]):([0-5][0-9])$/, {
     message: 'time must be HH:mm',
   })
-  time?: string; // "HH:mm"
+  time?: string;
 
   @IsOptional()
   @Type(() => Number)
   @Min(1)
-  partySize?: number; // liczba osób
+  partySize?: number;
 
   @IsOptional()
   @IsString()
@@ -51,14 +51,17 @@ export class FilterRestaurantsDto {
 
   @IsOptional()
   @IsNumber()
+  @Type(() => Number)
   radius?: number;
 
   @IsOptional()
   @IsNumber()
+  @Type(() => Number)
   latitude?: number;
 
   @IsOptional()
   @IsNumber()
+  @Type(() => Number)
   longitude?: number;
 
   @IsOptional()
