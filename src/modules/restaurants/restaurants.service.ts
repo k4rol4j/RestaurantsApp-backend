@@ -93,7 +93,7 @@ export class RestaurantsService {
       const districts = parts.slice(1);
 
       if (districts.length > 0) {
-        // ⭐ Dzielnice TYLKO w wybranym mieście
+        // ⭐ DZIELNICE – TYLKO W WYBRANYM MIEŚCIE
         andConditions.push({
           AND: [
             { address: { city: { equals: cityName, mode: 'insensitive' } } },
@@ -105,10 +105,10 @@ export class RestaurantsService {
           ],
         });
       } else {
-        // ⭐ Tylko miasto
+        // ⭐ SAMO MIASTO — TYLKO DOKŁADNE DOPASOWANIE
         andConditions.push({
           address: {
-            city: { equals: cityName, mode: 'insensitive' },
+            city: { equals: cityName, mode: 'insensitive' }, // ← TU ZMIANA
           },
         });
       }
