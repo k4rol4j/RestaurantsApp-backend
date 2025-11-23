@@ -79,28 +79,36 @@ export class RestaurantsService {
       });
     }
 
-    // 📍 Lokalizacja (city/district)
-    if (location) {
-      // Jeśli location to wiele dzielnic — rozbijamy
+    // 📍 Lokalizacja (miasto + wielokrotne dzielnice)
+    if (
+      location &&
+      !(
+        typeof latitude === 'number' &&
+        typeof longitude === 'number' &&
+        typeof radius === 'number'
+      )
+    ) {
       const parts = location.split(',').map((x) => x.trim());
+      const cityName = parts[0];
+      const districts = parts.slice(1);
 
-      if (parts.length > 1 && parts[0]) {
-        // dzieje się filtrowanie DZIELNIC
+      if (districts.length > 0) {
+        // ⭐ Dzielnice TYLKO w wybranym mieście
         andConditions.push({
           AND: [
-            { address: { city: { equals: parts[0], mode: 'insensitive' } } },
+            { address: { city: { equals: cityName, mode: 'insensitive' } } },
             {
               address: {
-                district: { in: parts.slice(1), mode: 'insensitive' },
+                district: { in: districts, mode: 'insensitive' },
               },
             },
           ],
         });
       } else {
-        // zwykłe filtrowanie po jednym city
+        // ⭐ Tylko miasto
         andConditions.push({
           address: {
-            city: { contains: location, mode: 'insensitive' },
+            city: { equals: cityName, mode: 'insensitive' },
           },
         });
       }
