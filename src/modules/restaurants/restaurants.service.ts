@@ -85,7 +85,6 @@ export class RestaurantsService {
       const parts = location.split(',').map((x) => x.trim());
 
       if (parts.length > 1 && parts[0]) {
-        // dzieje się filtrowanie DZIELNIC
         andConditions.push({
           AND: [
             { address: { city: { equals: parts[0], mode: 'insensitive' } } },
@@ -97,10 +96,9 @@ export class RestaurantsService {
           ],
         });
       } else {
-        // zwykłe filtrowanie po jednym city
         andConditions.push({
           address: {
-            city: { contains: location, mode: 'insensitive' },
+            city: { equals: parts[0], mode: 'insensitive' },
           },
         });
       }
