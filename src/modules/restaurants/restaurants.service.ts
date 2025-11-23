@@ -81,14 +81,29 @@ export class RestaurantsService {
 
     // 📍 Lokalizacja (city/district)
     if (location) {
-      andConditions.push({
-        OR: [
-          { address: { city: { contains: location, mode: 'insensitive' } } },
-          {
-            address: { district: { contains: location, mode: 'insensitive' } },
+      // Jeśli location to wiele dzielnic — rozbijamy
+      const parts = location.split(',').map((x) => x.trim());
+
+      if (parts.length > 1 && parts[0]) {
+        // dzieje się filtrowanie DZIELNIC
+        andConditions.push({
+          AND: [
+            { address: { city: { equals: parts[0], mode: 'insensitive' } } },
+            {
+              address: {
+                district: { in: parts.slice(1), mode: 'insensitive' },
+              },
+            },
+          ],
+        });
+      } else {
+        // zwykłe filtrowanie po jednym city
+        andConditions.push({
+          address: {
+            city: { contains: location, mode: 'insensitive' },
           },
-        ],
-      });
+        });
+      }
     }
 
     // 🍽 Kuchnie
